@@ -1,0 +1,76 @@
+name: prebuilds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-13,         platform: macOS-X64 }
+          - { os: macos-14,         platform: macOS-ARM64 }
+          - { os: ubuntu-latest,    platform: Linux-X64 }
+          - { os: ubuntu-24.04-arm, platform: Linux-ARM64 }
+          - { os: windows-latest,   platform: Windows-X64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/lang-dart
+    steps:
+      - uses: actions/checkout@v4
+
+      # Optional: regenerate src/ C artifacts from the pinned grammar source.
+      # The committed src/ is already generated from this exact commit, so this
+      # step is a no-op sanity check unless the grammar pin is bumped.
+      - name: Show pinned grammar commit
+        run: echo "grammar: nielsenko/tree-sitter-dart @ b57d734c84f510bbd524097902cab671e4dbfca9 (src/ committed)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/lang-dart/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build parser (Unix)
+        if: runner.os != 'Windows'
+        run: npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
+
+      - name: Build parser (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: packages/lang-dart/prebuilds/prebuild-${{ matrix.platform }}/parser.so
+          if-no-files-found: error
+
+  merge:
+    # Collect all platform artifacts into a single prebuilds/ bundle for
+    # manual download or use in a release.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: merged
+      - name: Assemble prebuilds/
+        run: |
+          mkdir -p prebuilds
+          for d in merged/prebuild-*; do
+            cp -R "$d" prebuilds/
+          done
+          find prebuilds -type f
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-all
+          path: prebuilds/

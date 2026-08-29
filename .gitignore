@@ -1,0 +1,5 @@
+node_modules/
+parser.so
+*.log
+.DS_Store
+package-lock.json.tmp

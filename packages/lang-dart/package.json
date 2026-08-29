@@ -1,0 +1,39 @@
+{
+  "name": "@scan-repo-map/lang-dart",
+  "version": "0.1.0",
+  "description": "ast-grep dynamic language pack for Dart (grammar from nielsenko/tree-sitter-dart @ b57d734c84f510bbd524097902cab671e4dbfca9)",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "type.d.ts",
+    "postinstall.js",
+    "src",
+    "prebuilds"
+  ],
+  "keywords": [
+    "ast-grep",
+    "ast-grep-lang",
+    "dart"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "@ast-grep/setup-lang": "0.0.6"
+  },
+  "peerDependencies": {
+    "tree-sitter-cli": "0.25.8"
+  },
+  "peerDependenciesMeta": {
+    "tree-sitter-cli": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ast-grep/napi": "^0.45.2",
+    "tree-sitter-cli": "0.25.8"
+  },
+  "scripts": {
+    "build": "tree-sitter build -o parser.so",
+    "postinstall": "node postinstall.js"
+  }
+}
