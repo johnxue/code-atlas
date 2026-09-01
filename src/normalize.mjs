@@ -4,8 +4,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+import { escapeRe } from './textproc.mjs'
 
 // resolve_map_pkg：pubspec.yaml 的 name（Dart package:self 判别依据）。
 // 只看 <dir>/pubspec.yaml 或 <dir>/../pubspec.yaml 第一个存在的文件；无 name: 行则空串。
