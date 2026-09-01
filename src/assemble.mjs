@@ -196,7 +196,12 @@ export function backrefs(importLines, excludes, targetDirAbs, mapPkg) {
   const aggregated = []
   let cur = null
   const flush = () => {
-    if (cur) aggregated.push(`${cur.mod}\t${cur.cnt}\t${cur.files.join(', ')}`)
+    if (!cur) return
+    const n = cur.cnt
+    const lim = Math.min(n, 10)
+    let files = cur.files.slice(0, lim).join(', ')
+    if (n > 10) files += ` …+${n - 10}`
+    aggregated.push(`${cur.mod}\t${n}\t${files}`)
   }
   for (const row of rows) {
     if (!cur || cur.mod !== row.mod) {

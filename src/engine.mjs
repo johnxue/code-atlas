@@ -260,12 +260,8 @@ export class Engine {
     for (const lang of Object.keys(byLang)) {
       const files = byLang[lang]
       if (files.length === 0) continue // 无文件：合法空结果，静默跳过
-      const roots = await parsePool(lang, files, (abs) => {
-        // 解析失败：记诊断，跳过该文件
-        const rel = abs.startsWith(targetDirAbs + '/') ? abs.slice(targetDirAbs.length + 1) : abs
-        this.recordWarning(lang, `parse:${rel}`, '文件解析失败，已跳过')
-        return null
-      })
+      // 不可读/非 UTF-8/过大文件：与 CLI read_file 一致，静默跳过
+      const roots = await parsePool(lang, files, () => {})
       const entries = []
       for (let i = 0; i < files.length; i++) {
         const root = roots[i]
@@ -323,7 +319,19 @@ export class Engine {
   }
 }
 
-async function parsePool(lang, files, onError) {
+// CLI utils/mod.rs read_file 的跳过语义：>3MB 且 >20 万行的文件跳过（与的关系，宁多勿漏）
+const MAX_FILE_SIZE = 3_000_000
+const MAX_LINE_COUNT = 200_000
+const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true })
+
+function fileTooLarge(byteLength, text) {
+  if (byteLength <= MAX_FILE_SIZE) return false
+  let lines = text.split('\n').length
+  if (text.endsWith('\n')) lines -= 1
+  return lines > MAX_LINE_COUNT
+}
+
+async function parsePool(lang, files, onSkip) {
   const CONCURRENCY = 8
   const results = new Array(files.length)
   let next = 0
@@ -331,11 +339,23 @@ async function parsePool(lang, files, onError) {
     while (next < files.length) {
       const i = next++
       try {
-        const src = readFileSync(files[i], 'utf8')
+        const buf = readFileSync(files[i])
+        // 空文件 / 非 UTF-8 / 过大文件：与 CLI read_file 一致，静默跳过
+        let src
+        try {
+          src = UTF8_STRICT.decode(buf)
+        } catch {
+          onSkip(files[i])
+          continue
+        }
+        if (buf.length === 0 || fileTooLarge(buf.length, src)) {
+          onSkip(files[i])
+          continue
+        }
         results[i] = (await parseAsync(lang, src)).root()
       } catch {
         results[i] = null
-        onError(files[i])
+        onSkip(files[i])
       }
     }
   }

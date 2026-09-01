@@ -124,6 +124,17 @@ export function extractKindJq(engine, ctx, rule) {
   }
 }
 
+// 多行模块名（如多行 import 语句解析出的模块）在 Bash 版按物理行落盘：首行成为
+// `📁 f [Ln] import <首段>`，续行成为不匹配行（后续各区转换时被丢弃）。逐字节复刻。
+function pushPhysicalLines(bucket, row) {
+  if (!row.includes('\n')) {
+    bucket.push(row)
+    return
+  }
+  const parts = row.split('\n')
+  for (let i = 0; i < parts.length; i++) bucket.push(parts[i])
+}
+
 // extract_import <lang> <pattern> <metavar> <raw|as-strip>
 export function extractImport(engine, ctx, rule) {
   const { lang, pattern, metavar, clean } = rule
@@ -137,7 +148,7 @@ export function extractImport(engine, ctx, rule) {
     const line = node.range().start.line + 1
     const m = clean === 'as-strip' ? importAs(node.getMatch(metavar)?.text()) : importRaw(node.getMatch(metavar)?.text())
     if (m === null) continue
-    ctx.imports.push(`📁 ${rel} [L${line}] import ${m}`)
+    pushPhysicalLines(ctx.imports, `📁 ${rel} [L${line}] import ${m}`)
   }
 }
 
@@ -153,7 +164,7 @@ export function extractImportKind(engine, ctx, rule) {
     const line = node.range().start.line + 1
     const m = clean(node.text())
     if (m === null) continue
-    ctx.imports.push(`📁 ${rel} [L${line}] import ${m}`)
+    pushPhysicalLines(ctx.imports, `📁 ${rel} [L${line}] import ${m}`)
   }
 }
 
