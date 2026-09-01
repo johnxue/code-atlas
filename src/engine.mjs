@@ -14,7 +14,7 @@
 //
 // 文件发现复刻 ast-grep CLI（ignore crate）行为：
 //   - 隐藏目录跳过、隐藏文件包含；不跟随符号链接
-//   - 尊重 .gitignore（含扫描根的全部祖先目录）
+//   - .gitignore 仅当扫描目录位于 git 仓内时生效（require_git 默认；见下方 gitignore 段）
 //   - 无内置目录排除（node_modules 等仅由 .gitignore / dart 行级 find 排除）
 // ==============================================================================
 
@@ -239,6 +239,17 @@ function collectAncestorIgnores(rootAbs, stack) {
   }
 }
 
+// 扫描目录是否位于 git 仓内（自身或祖先含 .git；.git 可以是目录或 worktree 指针文件）
+function insideGitRepo(targetDirAbs) {
+  let cur = targetDirAbs
+  while (true) {
+    if (existsSync(path.join(cur, '.git'))) return true
+    const parent = path.dirname(cur)
+    if (parent === cur) return false
+    cur = parent
+  }
+}
+
 // ----------------------------------------------------------------
 // 文件发现：单次遍历，按语言分组
 // ----------------------------------------------------------------
@@ -253,13 +264,17 @@ export function collectLanguageFiles(targetDirAbs, langList) {
   for (const lang of new Set(Object.values(extToLang))) byLang[lang] = []
   if (Object.keys(extToLang).length === 0) return byLang
 
+  // require_git 语义：.gitignore 仅当扫描目录位于 git 仓内时生效（实证见上方注释）
+  const git = insideGitRepo(targetDirAbs)
   const ignore = new IgnoreStack()
-  collectAncestorIgnores(targetDirAbs, ignore)
+  if (git) collectAncestorIgnores(targetDirAbs, ignore)
 
   const visit = (dirAbs) => {
-    const gitignore = path.join(dirAbs, '.gitignore')
-    if (existsSync(gitignore)) {
-      try { ignore.add(dirAbs, readFileSync(gitignore, 'utf8')) } catch { /* 跳过 */ }
+    if (git) {
+      const gitignore = path.join(dirAbs, '.gitignore')
+      if (existsSync(gitignore)) {
+        try { ignore.add(dirAbs, readFileSync(gitignore, 'utf8')) } catch { /* 跳过 */ }
+      }
     }
     let entries
     try {
