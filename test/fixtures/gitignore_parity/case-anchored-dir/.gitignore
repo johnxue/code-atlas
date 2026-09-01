@@ -1,0 +1,4 @@
+/build/
+sub/gen/
+gen*.dart
+!generated.dart

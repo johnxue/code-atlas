@@ -8,6 +8,9 @@ const WS = '[ \\t\\r\\n\\f\\v]'
 const collapseWs = (s) => s.replace(new RegExp(`${WS}+`, 'g'), ' ')
 const trimWs = (s) => s.replace(new RegExp(`^${WS}+|${WS}+$`, 'g'), '')
 
+// 正则元字符转义（引擎 glob 翻译与 normalize 的包名正则共用）
+export const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 // extract_kinds 的 symname：split("(")[0] → split("=>")[0] → split("{")[0] → 去 ; →
 // 压缩空白 → trim → 最后一段（lib.sh extract_kinds jq def symname）
 export function symname(text) {

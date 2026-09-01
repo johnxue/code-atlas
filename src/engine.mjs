@@ -14,7 +14,7 @@
 //
 // 文件发现复刻 ast-grep CLI（ignore crate）行为：
 //   - 隐藏目录跳过、隐藏文件包含；不跟随符号链接
-//   - 尊重 .gitignore（含扫描根的全部祖先目录，git / 非 git 目录均生效）
+//   - 尊重 .gitignore（含扫描根的全部祖先目录）
 //   - 无内置目录排除（node_modules 等仅由 .gitignore / dart 行级 find 排除）
 // ==============================================================================
 
@@ -22,6 +22,7 @@ import { createRequire } from 'node:module'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { parse, parseAsync, registerDynamicLanguage } from '@ast-grep/napi'
+import { escapeRe } from './textproc.mjs'
 
 const require = createRequire(import.meta.url)
 
@@ -77,13 +78,22 @@ function registerLanguages(langList) {
 }
 
 // ----------------------------------------------------------------
-// gitignore 匹配（对齐 ignore crate：祖先目录 + 行走中发现的 .gitignore）
+// gitignore 匹配（对齐 ignore crate 0.45.x 的实证行为）：
+//   - .gitignore 仅当扫描目录位于 git 仓内（自身或祖先含 .git，require_git）时生效；
+//   - 生效时读取扫描根的全部祖先与行走中发现的 .gitignore：深层文件覆盖浅层，行内后者覆盖前者；
+//   - 目录被规则命中 → 整棵剪枝（git 语义：被忽略目录内无法用否定规则复活）；
+//   - 否定/忽略判定只作用于规则命中的那个路径本身（子路径由剪枝负责）。
+// 语法对齐 gitignore(5) / globset：
+//   - * 与 ? 不跨路径段；** 仅在「段首且后随 /」或「前随 / 且段尾」时跨段，其余按普通 *；
+//   - [!...] 为取反字符类（即 [^...]）；] 紧随 [ 或 [! 时是字面量成员；[a-z] 范围；未闭合 [ 降级为字面量；
+//   - 反斜杠转义任意字符（\! \# \[ \\ 等）；未转义的尾随空格被去除；
+//   - 含（除尾随外）斜杠的模式锚定到 .gitignore 所在目录。
 // ----------------------------------------------------------------
 function parseIgnoreFile(text) {
   const rules = []
   for (let raw of text.split('\n')) {
-    // 去掉未被转义的尾随空格
-    raw = raw.replace(/(?<!\\)\s+$/, '')
+    // 去掉未被反斜杠转义的尾随空格（git trim_trailing_spaces 只删空格）
+    raw = raw.replace(/(?<!\\) +$/, '')
     if (raw === '' || raw.startsWith('#')) continue
     let negated = false
     if (raw.startsWith('!')) { negated = true; raw = raw.slice(1) }
@@ -92,25 +102,99 @@ function parseIgnoreFile(text) {
     let anchored = false
     if (raw.startsWith('/')) { anchored = true; raw = raw.slice(1) }
     else if (raw.includes('/')) anchored = true
-    // glob → regex：** 跨段；* / ? 不跨段；[...] 原样
-    let re = ''
-    for (let i = 0; i < raw.length; i++) {
-      const ch = raw[i]
-      if (ch === '*') {
-        if (raw[i + 1] === '*') {
-          // `**` 或 `/**/`
-          if (raw[i + 2] === '/') { re += '(?:.*/)?'; i += 2 } else { re += '.*'; i += 1 }
-        } else re += '[^/]*'
-      } else if (ch === '?') re += '[^/]'
-      else if (ch === '[') {
-        const end = raw.indexOf(']', i + 1)
-        if (end === -1) { re += '\\[' } else { re += raw.slice(i, end + 1); i = end }
-      } else re += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    }
-    const body = anchored ? `^${re}(?:/.*)?$` : `(?:^|/)${re}(?:/.*)?$`
+    const re = globToRegex(raw)
+    const body = anchored ? `^${re}$` : `(?:^|/)${re}$`
     rules.push({ negated, dirOnly, regex: new RegExp(body) })
   }
   return rules
+}
+
+// 字符类成员转义：保留 - 供范围使用，转义会破坏类结构的字符
+const escapeClassChar = (c) => {
+  if (c === '\\' || c === '^' || c === '[' || c === ']') return '\\' + c
+  return c
+}
+
+// 解析 [ 起始的字符类；返回 { re, end }（end 指向 ']' 之后），未闭合返回 null
+function parseClass(glob, start) {
+  let i = start + 1
+  let negated = false
+  if (glob[i] === '!') { negated = true; i++ }
+  let body = ''
+  let first = true
+  while (i < glob.length) {
+    const c = glob[i]
+    if (c === ']' && !first) {
+      if (body === '') return null // [] / [!] 空类：按未闭合处理（字面量）
+      return { re: `[${negated ? '^' : ''}${body}]`, end: i + 1 }
+    }
+    if (c === '\\' && i + 1 < glob.length) {
+      body += escapeClassChar(glob[i + 1])
+      i += 2
+      first = false
+      continue
+    }
+    body += escapeClassChar(c)
+    first = false
+    i++
+  }
+  return null
+}
+
+function globToRegex(glob) {
+  let re = ''
+  let i = 0
+  const n = glob.length
+  while (i < n) {
+    const ch = glob[i]
+    if (ch === '\\') {
+      if (i + 1 < n) {
+        re += escapeRe(glob[i + 1])
+        i += 2
+      } else {
+        re += '\\\\' // 孤立尾反斜杠按字面量
+        i++
+      }
+      continue
+    }
+    if (ch === '*') {
+      let j = i
+      while (j < n && glob[j] === '*') j++
+      const prevIsBoundary = i === 0 || glob[i - 1] === '/'
+      const nextIsSlash = j < n && glob[j] === '/'
+      const atEnd = j >= n
+      if (j - i >= 2 && prevIsBoundary && nextIsSlash) {
+        re += '(?:.*/)?' // **/ ：零层或多层目录
+        i = j + 1
+      } else if (j - i >= 2 && prevIsBoundary && atEnd) {
+        re += '.*' // 尾随 /** ：目录内全部（跨层）
+        i = j
+      } else {
+        re += '[^/]*' // 普通 *（连续多个按普通星号处理，等价单个）
+        i = j
+      }
+      continue
+    }
+    if (ch === '?') {
+      re += '[^/]'
+      i++
+      continue
+    }
+    if (ch === '[') {
+      const parsed = parseClass(glob, i)
+      if (parsed) {
+        re += parsed.re
+        i = parsed.end
+      } else {
+        re += '\\[' // 未闭合：字面量 [
+        i++
+      }
+      continue
+    }
+    re += escapeRe(ch)
+    i++
+  }
+  return re
 }
 
 class IgnoreStack {

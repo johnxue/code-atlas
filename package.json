@@ -7,7 +7,7 @@
     "scan_repo_map": "./bin/scan_repo_map.mjs"
   },
   "scripts": {
-    "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs",
+    "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs && node test/gitignore_parity.test.mjs",
     "golden": "bash test/golden.sh"
   },
   "engines": {
