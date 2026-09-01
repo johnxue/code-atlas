@@ -318,6 +318,15 @@ async function main() {
     expectGrep('Worktree 写 unavailable', '^# Worktree: unavailable', w('no_git/m.md'))
   }
 
+  // 14b. -d 传文件路径必须报错（与 Bash [[ ! -d ]] 语义一致，文案与 Bash 相同）
+  info('target_dir_is_file')
+  {
+    const r = runScan(['-d', path.join(SRC, 'pubspec.yaml'), '-n', 'x', '-o', w('target_dir_is_file/m.md')])
+    const expected = `❌ Error: Target directory does not exist: ${path.join(SRC, 'pubspec.yaml')}`
+    if (r.status !== 0 && (r.stderr || '').includes(expected)) ok('-d 传文件路径报错且文案与 Bash 一致')
+    else fail(`-d 传文件路径应报错且文案一致 (exit=${r.status}, stderr=${(r.stderr || '').slice(0, 200)})`)
+  }
+
   // 15. 真实 Flutter 目录（wisdom_app lib/）若存在且是 git 仓库 → 验证 header 有 commit
   info('git_freshness')
   const LIB = '/Users/xuehai/development/wisdom_app/lib'

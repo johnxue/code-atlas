@@ -7,7 +7,7 @@
 // Engine/rules/output semantics live in src/*.
 // ==============================================================================
 
-import { existsSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -116,7 +116,12 @@ export function parseArgs(argv, argv0) {
 }
 
 export function resolveScanConfig(opts) {
-  if (!existsSync(opts.targetDir)) {
+  // 与 Bash `[[ ! -d ]]` 一致：必须存在且为目录（传文件路径同样报错，退出码 1）
+  let isDir = false
+  try {
+    isDir = statSync(opts.targetDir).isDirectory()
+  } catch { /* 不存在 */ }
+  if (!isDir) {
     console.error(`❌ Error: Target directory does not exist: ${opts.targetDir}`)
     process.exit(1)
   }
