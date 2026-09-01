@@ -53,6 +53,13 @@ npm run golden  # 对 scan_repo_map 仓自身与 wisdom_app lib/ 做 Node vs Bas
 
 性能基线（wisdom_app lib/，106 个 dart 文件）：Bash 版 ~5.1s，Node 版 ~0.5s（AST 每文件仅解析一次）。
 
+## gitignore 语义（与 Bash 版一致的已知行为）
+
+- `.gitignore` 仅当扫描目录位于 git 仓内（自身或祖先含 `.git`）时生效（ast-grep → ignore crate 的 require_git 默认语义）；生效时祖先与逐层 `.gitignore` 深层覆盖浅层。
+- 字符类支持取反 `[!a]`（即 `[^a]`）、范围 `[a-z]`、`]` 紧随 `[`/`[!` 时为字面量、未闭合 `[` 降级为字面量；`\!`、`\#`、`\[` 等反斜杠转义有效。
+- 目录被规则命中即整棵剪枝（被忽略目录内不可用否定规则复活，与 git 一致）。
+- Dart api-call 行级回退会跟随软链读取文件（对应 Bash 版 `find` 无 `-type f` + perl `open` 跟随软链）：坏软链读失败记入 ⚠️ 诊断区。**已知行为，两版一致，勿单方面收紧**（会破坏 golden 契约）。
+
 ## Dart 语法源
 
 官方 `@ast-grep/lang-dart@0.0.7` 的语法过旧不可用。本包语法源为：

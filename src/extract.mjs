@@ -187,6 +187,8 @@ export function extractUrls(engine, ctx, rule) {
 
 // extract_dart_api_lines：Dart api-call 行级启发式（kind 路线不可用）
 // 正则与 perl 版逐字符一致；输出复刻 perl → `while IFS=: read` 管道的行切分行为。
+// 约束：文件遍历跟随软链、读取可达的仓外文件（Bash 侧 = find 无 -type f + perl open
+// 跟随软链），坏软链读失败记诊断——两版行为一致，收紧任一侧都会破坏 golden 契约。
 export function extractDartApiLines(engine, ctx) {
   if (!ctx.langList.includes('dart')) return
   const files = findLikeWalk(ctx.targetDirAbs, (name) => name.endsWith('.dart'))
