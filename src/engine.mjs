@@ -302,7 +302,13 @@ export class Engine {
   // 查询失败 → 记诊断并返回空（不阻断）
   findAll(lang, ruleArg, subject) {
     const scan = this.scans.get(lang)
-    if (!scan) return []
+    if (!scan) {
+      // 未知语言名（非本仓支持表内）→ 记诊断（对齐 CLI rc=2 契约）；已知语言无文件 → 静默
+      if (!LANG_EXTENSIONS[lang]) {
+        this.recordWarning(lang, subject, 'ast-grep 执行失败 (exit 2): 未知或不支持的语言')
+      }
+      return []
+    }
     const out = []
     for (const { abs, root } of scan) {
       let matches

@@ -57,9 +57,14 @@ export async function mergeMain(opts, cfg) {
   let firstRoot = null
   for (const f of inputs) {
     // freshness 从输入地图自身 header 读取，不取自当前 -d
-    let src = grepHeaderLine(f, '# Source Path: ')
-    let commit = grepHeaderLine(f, '# Source Commit: ')
-    let wtree = grepHeaderLine(f, '# Worktree: ')
+    // （r 为完整行，用于不一致警告；src/commit/wtree 为去前缀后的值）
+    const strip = (prefix) => {
+      const line = grepHeaderLine(f, prefix)
+      return line === '' ? '' : line.slice(prefix.length)
+    }
+    let src = strip('# Source Path: ')
+    let commit = strip('# Source Commit: ')
+    let wtree = strip('# Worktree: ')
     if (src === '') src = 'unavailable'
     if (commit === '') commit = 'unavailable'
     if (wtree === '') wtree = 'unavailable'

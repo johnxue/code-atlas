@@ -1,10 +1,25 @@
 # scan_repo_map
 
-将 Bash 版 `scripts/scan_repo_map.sh`（位于 wisdom_app 仓库）重写为 Node.js + `@ast-grep/napi` 的项目，后续会封装为 agent skill。本仓库首先提供 ast-grep 动态语言包。
+将 Bash 版 `scripts/scan_repo_map.sh`（位于 wisdom_app 仓库）重写为 Node.js + `@ast-grep/napi` 的项目，后续会封装为 agent skill。本仓库包含完整的 Node 版扫描器与 ast-grep 动态语言包。
 
 ## 目录结构
 
 ```
+bin/scan_repo_map.mjs   CLI 入口（参数解析/调度/校验），对应 scan_repo_map.sh
+src/
+  engine.mjs            run_ast_grep 等价层：文件发现(gitignore) + 按语言缓存 AST + findAll + 错误语义
+  extract.mjs           extract_symbols/route/kinds/kind_jq/import/import_kind/urls/dart_api_lines
+  textproc.mjs          jq/perl 等价物：import 清洗、urls 首参提取、classlike 标签、dart_topvar、symname
+  normalize.mjs         导入归一化 + 外部依赖折叠
+  assemble.mjs          排序/去重/截断 + 各区组装
+  freshness.mjs         git 元数据 + header
+  merge.mjs             --merge 模式
+  rules/*.mjs           语言规则清单（与 Bash 版 rules_*.sh 逐条机械对应）
+test/
+  scan_repo_map.test.mjs  77 项断言（Bash 版测试的移植）
+  rules_parity.test.mjs   规则清单与 Bash 源文件机械交叉校验
+  golden.sh               Node 版 vs Bash 版 golden 对拍（normalize 后 diff 须为空）
+  fixtures/               已提交 fixture 仓库
 packages/lang-dart/     Dart 动态语言包（@ast-grep/lang-* 系列风格）
   index.js              语言注册入口（libraryPath / extensions / languageSymbol / expandoChar）
   index.d.ts            LanguageRegistration 类型（与官方包一致）
@@ -16,6 +31,27 @@ packages/lang-dart/     Dart 动态语言包（@ast-grep/lang-* 系列风格）
   test/verify.mjs       端到端验证脚本
 .github/workflows/prebuilds.yml   5 平台 prebuild CI
 ```
+
+## 使用
+
+```bash
+npm install
+node bin/scan_repo_map.mjs -d <目标目录> -n <模块名> -o <输出地图.md>
+node bin/scan_repo_map.mjs --merge a.md b.md -n all -o all.md
+```
+
+CLI 参数与 Bash 版完全一致（-d/-o/-n/-x/-e/-m/--languages/--merge/-v/-h）。
+
+## 测试与对拍
+
+```bash
+npm test        # 77 项 fixture 断言 + 规则清单与 Bash 源文件交叉校验
+npm run golden  # 对 scan_repo_map 仓自身与 wisdom_app lib/ 做 Node vs Bash 对拍（须逐字节一致）
+```
+
+语言包可用性基线：@ast-grep/lang-{python,go,kotlin,java,swift,c,cpp} 各包所需 kind 全部可用，无需自建（dart 用本仓 lang-dart）。
+
+性能基线（wisdom_app lib/，106 个 dart 文件）：Bash 版 ~5.1s，Node 版 ~0.5s（AST 每文件仅解析一次）。
 
 ## Dart 语法源
 

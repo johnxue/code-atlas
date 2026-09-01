@@ -7,19 +7,20 @@
     "scan_repo_map": "./bin/scan_repo_map.mjs"
   },
   "scripts": {
-    "test": "node test/scan_repo_map.test.mjs"
+    "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs",
+    "golden": "bash test/golden.sh"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@ast-grep/lang-c": "^0.0.6",
-    "@ast-grep/lang-cpp": "^0.0.6",
-    "@ast-grep/lang-go": "^0.0.6",
-    "@ast-grep/lang-java": "^0.0.7",
-    "@ast-grep/lang-kotlin": "^0.0.7",
-    "@ast-grep/lang-python": "^0.0.6",
-    "@ast-grep/lang-swift": "^0.0.8",
+    "@ast-grep/lang-c": "0.0.6",
+    "@ast-grep/lang-cpp": "0.0.6",
+    "@ast-grep/lang-go": "0.0.6",
+    "@ast-grep/lang-java": "0.0.7",
+    "@ast-grep/lang-kotlin": "0.0.7",
+    "@ast-grep/lang-python": "0.0.6",
+    "@ast-grep/lang-swift": "0.0.8",
     "@ast-grep/napi": "0.45.2",
     "@scan-repo-map/lang-dart": "file:./packages/lang-dart"
   }
