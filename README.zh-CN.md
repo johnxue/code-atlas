@@ -26,8 +26,11 @@ grep '^🔗 lib/auth' map.md     # 改它会影响谁？
 
 ## 2. 在各 Agent 平台上安装
 
-需要 Node >= 18。把本仓 clone（或复制）到你所用 Agent 的 skills 目录下，目录名必须为
-`repo-map`，然后装一次依赖：
+需要 Node >= 18。首选：`npm install -g code-atlas && code-atlas install`——安装器探测各 Agent
+的 skills 目录（见下表），把 skill 以 `code-atlas/` 为名复制进去并就地 `npm install`。
+
+从源码安装：把本仓 clone（或复制）到你所用 Agent 的 skills 目录下，目录名必须为
+`code-atlas`，然后装一次依赖：
 
 | Agent 平台 | skills 目录 |
 |---|---|
@@ -41,12 +44,12 @@ grep '^🔗 lib/auth' map.md     # 改它会影响谁？
 通用路径示例：
 
 ```bash
-git clone https://github.com/johnxue/code-atlas ~/.agents/skills/repo-map
-cd ~/.agents/skills/repo-map && npm install
+git clone https://github.com/johnxue/code-atlas ~/.agents/skills/code-atlas
+cd ~/.agents/skills/code-atlas && npm install
 ```
 
 若你的平台路径不同，把目录放到该平台扫描 `SKILL.md` 的位置即可——目录须命名为
-`repo-map` 且仓根的 `SKILL.md` 在其根部。
+`code-atlas` 且仓根的 `SKILL.md` 在其根部。
 macOS arm64/x64 直接使用已入库的 prebuild，开箱即用；Linux/Windows 在 CI prebuild 补齐前，
 首次安装会现场编译 Dart 语法（仅此时需要 C 编译链）。
 
@@ -58,8 +61,8 @@ macOS arm64/x64 直接使用已入库的 prebuild，开箱即用；Linux/Windows
 - "我改 `AudioRepository` 会影响谁？"
 - "登录页调了哪些 API 路由？"
 
-Agent 会自行触发 `repo-map` skill：扫描（或复用新鲜地图）、grep 地图、以 `文件:行号`
-作答。想显式调用就输入 `/repo-map`。
+Agent 会自行触发 `code-atlas` skill：扫描（或复用新鲜地图）、grep 地图、以 `文件:行号`
+作答。想显式调用就输入 `/code-atlas`（`build` / `check` / `merge` 配方见 SKILL.md）。
 
 高级用户也可直接跑 CLI（见第 6 节），例如在 CI 里预生成地图，或用 `--merge` 合并多个模块地图。
 

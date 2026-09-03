@@ -28,7 +28,11 @@ grep '^🔗 lib/auth' map.md     # これを変えると誰に影響する？
 
 ## 2. 各 Agent プラットフォームでのインストール
 
-Node >= 18 が必要です。このリポジトリを使用中の Agent の skills ディレクトリに `repo-map`
+Node >= 18 が必要です。推奨：`npm install -g code-atlas && code-atlas install`——インストーラは
+各 Agent の skills ディレクトリ（下表）を検出し、skill を `code-atlas/` としてコピーして
+その場で `npm install` します。
+
+ソースからの場合：このリポジトリを使用中の Agent の skills ディレクトリに `code-atlas`
 という名前で clone（またはコピー）し、依存を一度インストールします：
 
 | Agent プラットフォーム | skills ディレクトリ |
@@ -43,12 +47,12 @@ Node >= 18 が必要です。このリポジトリを使用中の Agent の skil
 汎用パスの例：
 
 ```bash
-git clone https://github.com/johnxue/code-atlas ~/.agents/skills/repo-map
-cd ~/.agents/skills/repo-map && npm install
+git clone https://github.com/johnxue/code-atlas ~/.agents/skills/code-atlas
+cd ~/.agents/skills/code-atlas && npm install
 ```
 
 プラットフォームのパスが異なる場合は、そのプラットフォームが `SKILL.md` をスキャンする場所に
-置いてください——ディレクトリ名は `repo-map`、リポジトリの `SKILL.md` がその直下にある必要があります。
+置いてください——ディレクトリ名は `code-atlas`、リポジトリの `SKILL.md` がその直下にある必要があります。
 macOS arm64/x64 はコミット済み prebuild で即座に動きます；Linux/Windows は CI の prebuild が
 揃うまで、初回インストール時に Dart 文法をソースからビルドします（その場合のみ C ツールチェインが必要）。
 
@@ -60,8 +64,9 @@ macOS arm64/x64 はコミット済み prebuild で即座に動きます；Linux/
 - 「`AudioRepository` を変えると誰に影響する？」
 - 「ログインページはどの API ルートを呼んでいる？」
 
-Agent が `repo-map` スキルを自動で起動し、スキャン（または新鮮な地図を再利用）→ 地図を grep →
-`ファイル:行号` で回答します。明示的に呼ぶには `/repo-map` と入力してください。
+Agent が `code-atlas` スキルを自動で起動し、スキャン（または新鮮な地図を再利用）→ 地図を grep →
+`ファイル:行号` で回答します。明示的に呼ぶには `/code-atlas` と入力してください
+（`build` / `check` / `merge` のレシピは SKILL.md 参照）。
 
 パワーユーザは CLI を直接実行することもできます（第 6 節）。CI で地図を事前生成したり、
 `--merge` で複数モジュールの地図を統合したりする場合に便利です。

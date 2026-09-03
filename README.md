@@ -27,8 +27,12 @@ grep '^🔗 lib/auth' map.md     # who breaks if I change this?
 
 ## 2. Install
 
-Requires Node >= 18. Clone (or copy) this repo into your agent's skills directory under the name
-`repo-map`, then install dependencies once:
+Requires Node >= 18. Preferred: `npm install -g code-atlas && code-atlas install` — the installer
+detects your agents' skills directories (see table), copies the skill into each as `code-atlas/`,
+and runs `npm install` there.
+
+From source: clone (or copy) this repo into your agent's skills directory under the name
+`code-atlas`, then install dependencies once:
 
 | Agent platform | Skills directory |
 |---|---|
@@ -42,12 +46,12 @@ Requires Node >= 18. Clone (or copy) this repo into your agent's skills director
 Example (universal path):
 
 ```bash
-git clone https://github.com/johnxue/code-atlas ~/.agents/skills/repo-map
-cd ~/.agents/skills/repo-map && npm install
+git clone https://github.com/johnxue/code-atlas ~/.agents/skills/code-atlas
+cd ~/.agents/skills/code-atlas && npm install
 ```
 
 If your platform's path differs, put it wherever that platform scans `SKILL.md` folders — the
-folder must be named `repo-map` and contain this repo's `SKILL.md` at its root.
+folder must be named `code-atlas` and contain this repo's `SKILL.md` at its root.
 macOS arm64/x64 run instantly from committed prebuilds; Linux/Windows build the Dart grammar
 from source on first install until CI prebuilds land (a C toolchain is needed only there).
 
@@ -59,8 +63,9 @@ from source on first install until CI prebuilds land (a C toolchain is needed on
 - "What breaks if I change `AudioRepository`?"
 - "Which API routes does the login page call?"
 
-The agent fires the `repo-map` skill on its own: it scans (or reuses a fresh map), greps the map,
-and answers with `file:line` references. To invoke it explicitly, type `/repo-map`.
+The agent fires the `code-atlas` skill on its own: it scans (or reuses a fresh map), greps the map,
+and answers with `file:line` references. To invoke it explicitly, type `/code-atlas`
+(`build` / `check` / `merge` recipes live in SKILL.md).
 
 Power users can also run the CLI directly (see section 6), e.g. to pre-generate maps in CI or to
 merge several module maps with `--merge`.
