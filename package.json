@@ -19,7 +19,7 @@
     "llm-context"
   ],
   "bin": {
-    "scan_repo_map": "./bin/scan_repo_map.mjs"
+    "code-atlas": "./bin/code-atlas.mjs"
   },
   "scripts": {
     "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs && node test/gitignore_parity.test.mjs",

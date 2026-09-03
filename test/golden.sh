@@ -14,7 +14,7 @@
 # ==============================================================================
 set -u
 
-NODE_CLI="$(cd "$(dirname "$0")/.." && pwd)/bin/scan_repo_map.mjs"
+NODE_CLI="$(cd "$(dirname "$0")/.." && pwd)/bin/code-atlas.mjs"
 BASH_CLI="/Users/xuehai/development/wisdom_app/scripts/scan_repo_map.sh"
 SNAPSHOT_DIR="$(cd "$(dirname "$0")" && pwd)/golden/snapshot"
 OUT=$(mktemp -d)

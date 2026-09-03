@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ==============================================================================
-// bin/scan_repo_map.mjs — Multi-Stack AST Repo Map Generator (Node + @ast-grep/napi)
+// bin/code-atlas.mjs — Multi-Stack AST Repo Map Generator (Node + @ast-grep/napi)
 // ==============================================================================
 // Node.js rewrite of the Bash scheduler (wisdom_app scripts/scan_repo_map.sh).
 // Responsibilities: CLI parsing → path validation → dispatch to scan or merge.
@@ -53,11 +53,11 @@ Options:
   -h, --help             Show this help message
 
 Examples:
-  ./bin/scan_repo_map.mjs -d ./admin-web -n frontend
-  ./bin/scan_repo_map.mjs -d ./backend -n backend -o ./docs/backend_map.md
-  ./bin/scan_repo_map.mjs -d ./flutter_app -n flutter
-  ./bin/scan_repo_map.mjs --merge ./backend_map.md ./flutter_map.md -n all -o ./all_map.md
-  ./bin/scan_repo_map.mjs -d ./lib -n flutter --languages dart -o docs/ast-maps/flutter-ast-map.md`)
+  ./bin/code-atlas.mjs -d ./admin-web -n frontend
+  ./bin/code-atlas.mjs -d ./backend -n backend -o ./docs/backend_map.md
+  ./bin/code-atlas.mjs -d ./flutter_app -n flutter
+  ./bin/code-atlas.mjs --merge ./backend_map.md ./flutter_map.md -n all -o ./all_map.md
+  ./bin/code-atlas.mjs -d ./lib -n flutter --languages dart -o docs/ast-maps/flutter-ast-map.md`)
 }
 
 export function parseArgs(argv, argv0) {
@@ -94,7 +94,7 @@ export function parseArgs(argv, argv0) {
       case '--languages': opts.languagesSet = true; opts.languages = needValue(a); break
       case '--merge': opts.mergeMode = true; break
       case '-v': case '--version':
-        console.log(`scan_repo_map.mjs v${VERSION}`)
+        console.log(`code-atlas v${VERSION}`)
         process.exit(0)
         break
       case '-h': case '--help':

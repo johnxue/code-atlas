@@ -17,7 +17,7 @@ import { Engine } from '../src/engine.mjs'
 import { normalizeMap } from './helpers.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const CLI = path.join(REPO_ROOT, 'bin', 'scan_repo_map.mjs')
+const CLI = path.join(REPO_ROOT, 'bin', 'code-atlas.mjs')
 const COMMITTED_FIXTURE = path.join(REPO_ROOT, 'test', 'fixtures', 'scan_repo_map', 'sample_repo')
 
 let PASS = 0

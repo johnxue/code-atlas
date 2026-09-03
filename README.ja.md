@@ -22,7 +22,7 @@ Hermes）向けの **skill** です。リポジトリを一度スキャンして
   いつ再スキャンすべきかを Agent が判断できます。
 
 ```bash
-node bin/scan_repo_map.mjs -d ./あなたのリポジトリ -n app -o map.md
+node bin/code-atlas.mjs -d ./あなたのリポジトリ -n app -o map.md
 grep '^🔗 lib/auth' map.md     # これを変えると誰に影響する？
 ```
 

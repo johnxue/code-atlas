@@ -22,11 +22,11 @@ until CI prebuilds land, requiring a C toolchain).
 ## Procedure
 
 1. **Locate the skill directory**: the directory holding this SKILL.md is the scanner root
-   (contains `bin/scan_repo_map.mjs`).
+   (contains `bin/code-atlas.mjs`).
 2. **Ensure dependencies**: if the skill directory has no `node_modules/`, run `npm install` in it.
 3. **Generate the map** (on the target repo or a subdirectory):
    ```
-   node <SKILL_DIR>/bin/scan_repo_map.mjs -d <target-dir> -n <module-name> -o <output.md>
+   node <SKILL_DIR>/bin/code-atlas.mjs -d <target-dir> -n <module-name> -o <output.md>
    ```
    Done when: stdout prints `✅ Generated` and the map header's `# Source Commit` / `# Worktree`
    lines are present.

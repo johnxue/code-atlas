@@ -82,7 +82,7 @@ export async function mergeMain(opts, cfg) {
   // 合并输出的 freshness 元数据：Merged from / Combined by / 逐模块三行
   const extraLines = [
     `Merged from: ${inputs.join(' ')}`,
-    `Combined by: scan_repo_map.mjs v2.0.0 (merge)`,
+    `Combined by: code-atlas.mjs v2.0.0 (merge)`,
     ...mergedExtra,
   ]
   const headerLines = buildFreshnessHeader({

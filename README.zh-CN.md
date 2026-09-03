@@ -20,7 +20,7 @@ Hermes）的 **skill**。它把仓库一次性扫描成一份 Markdown 地图—
 - **内建新鲜度**：每份地图带 Source Commit 与 Worktree 状态，Agent 知道何时该重扫。
 
 ```bash
-node bin/scan_repo_map.mjs -d ./你的仓库 -n app -o map.md
+node bin/code-atlas.mjs -d ./你的仓库 -n app -o map.md
 grep '^🔗 lib/auth' map.md     # 改它会影响谁？
 ```
 

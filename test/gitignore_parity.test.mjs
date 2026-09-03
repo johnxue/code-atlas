@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { normalizeMap } from './helpers.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const NODE_CLI = path.join(REPO_ROOT, 'bin', 'scan_repo_map.mjs')
+const NODE_CLI = path.join(REPO_ROOT, 'bin', 'code-atlas.mjs')
 const BASH_CLI = '/Users/xuehai/development/wisdom_app/scripts/scan_repo_map.sh'
 const FIXTURE_ROOT = path.join(REPO_ROOT, 'test', 'fixtures', 'gitignore_parity')
 

@@ -21,7 +21,7 @@ answers locate-style questions with a `grep` on the map instead of reading files
   knows when to rescan.
 
 ```bash
-node bin/scan_repo_map.mjs -d ./your-repo -n app -o map.md
+node bin/code-atlas.mjs -d ./your-repo -n app -o map.md
 grep '^🔗 lib/auth' map.md     # who breaks if I change this?
 ```
 
