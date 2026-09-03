@@ -2,6 +2,15 @@
 
 [中文](README.zh-CN.md) | [日本語](README.ja.md)
 
+**Code Atlas** turns a repository into a single Markdown map an AI agent can grep:
+symbols with line ranges, who-imports-whom, and API routes — no LSP, no indexing server,
+no jq/perl/system tools. One `npm install`, then:
+
+```bash
+node bin/scan_repo_map.mjs -d ./your-repo -n app -o map.md
+grep '^🔗 lib/auth' map.md     # who breaks if I change this?
+```
+
 A Node.js + `@ast-grep/napi` rewrite of the Bash `scan_repo_map.sh` scanner. The repo root doubles
 as the agent skill **repo-map** (see SKILL.md); the repo also contains the complete Node scanner
 and the ast-grep dynamic language packages.

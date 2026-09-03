@@ -1,8 +1,23 @@
 {
-  "name": "scan_repo_map",
-  "version": "2.0.0",
-  "description": "Node.js (@ast-grep/napi) rewrite of the Bash scan_repo_map AST repo map generator",
+  "name": "code-atlas",
+  "version": "2.1.0",
+  "description": "Agent skill that maps any repo into a greppable AST index — symbol ranges, import graph, reverse references, API routes. One npm install, zero system tools.",
   "type": "module",
+  "license": "MIT",
+  "author": "johnxue",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnxue/code-atlas.git"
+  },
+  "keywords": [
+    "agent-skill",
+    "ast-grep",
+    "tree-sitter",
+    "code-map",
+    "repo-index",
+    "ai-agents",
+    "llm-context"
+  ],
   "bin": {
     "scan_repo_map": "./bin/scan_repo_map.mjs"
   },
