@@ -191,9 +191,53 @@ function main() {
       byDest[badDest].status === 'failed' && byDest[badDest].reason.includes('npm install'))
     assert('失败后继续下一目标且成功',
       byDest[destOf(home, 'codex')].status === 'installed')
-    assert('失败目标也被复制（失败发生在 npm 环节）',
-      existsSync(path.join(badDest, 'SKILL.md')))
+    assertNoPath('新建失败目标已整体回滚（不留假完成目录）', badDest)
     rmSync(home, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
+  section('retry_after_failure_next_run_retries')
+  {
+    const SOURCE_VERSION = JSON.parse(
+      readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')).version
+    const failNpm = () => ({ ok: false, error: 'simulated npm failure (round 1)' })
+
+    // 场景 1：全新安装 npm 失败 → dest 整体回滚 → 下轮重试为 installed
+    const home1 = fakeHome()
+    makeRoots(home1, ['claude'])
+    const r1 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: failNpm })
+    assert('场景1 第一轮 failed 且整体退出码 1',
+      r1.code === 1 && r1.summary[0].status === 'failed')
+    assertNoPath('场景1 失败目录已回滚', destOf(home1, 'claude'))
+    const good1 = stubNpm()
+    const r2 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: good1.run })
+    assert('场景1 第二轮重试为 installed 而非 skipped',
+      r2.code === 0 && r2.summary[0].status === 'installed')
+    assert('场景1 第二轮确实重跑了 npm install', good1.calls.length === 1)
+    rmSync(home1, { recursive: true, force: true })
+
+    // 场景 2：替换旧版时 npm 失败 → 同版本 package.json 已就位 + 未完成标记
+    // → 下轮必须重试（这正是「版本相同则跳过」的假幂等隐患）→ 成功后标记消失
+    const home2 = fakeHome()
+    makeRoots(home2, ['claude'])
+    const dest2 = destOf(home2, 'claude')
+    mkdirSync(dest2, { recursive: true })
+    writeFileSync(path.join(dest2, 'package.json'),
+      JSON.stringify({ name: 'code-atlas', version: '0.0.1' }))
+    const r1b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: failNpm })
+    assert('场景2 第一轮 failed 且整体退出码 1',
+      r1b.code === 1 && r1b.summary[0].status === 'failed')
+    assert('场景2 失败后写入 .install-incomplete 标记',
+      existsSync(path.join(dest2, '.install-incomplete')))
+    assert('场景2 目录残留同版本 package.json（假幂等隐患的前提）',
+      JSON.parse(readFileSync(path.join(dest2, 'package.json'), 'utf8')).version === SOURCE_VERSION)
+    const good2 = stubNpm()
+    const r2b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: good2.run })
+    assert('场景2 第二轮同版本也重试为 installed 而非 skipped',
+      r2b.code === 0 && r2b.summary[0].status === 'installed')
+    assert('场景2 第二轮确实重跑了 npm install', good2.calls.length === 1)
+    assert('场景2 成功后标记清除', !existsSync(path.join(dest2, '.install-incomplete')))
+    rmSync(home2, { recursive: true, force: true })
   }
 
   // ----------------------------------------------------------------

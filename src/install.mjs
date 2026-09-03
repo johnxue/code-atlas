@@ -3,13 +3,15 @@
 // ==============================================================================
 // 纯 Node API（fs.cpSync / mkdirSync / rmSync），文件操作不经 shell（Windows 兼容）。
 // 唯一的子进程是 npm install --omit=dev（spawnSync 无 shell；Windows 走 npm.cmd + shell，
-// 因新版 Node 对 .cmd 直接 spawn 会 EINVAL）。homedir / runNpmInstall 可注入：
+// 因新版 Node 对 .cmd 直接 spawn 会 EINVAL）。homedir / npmRunner 可注入：
 // 测试用临时 HOME + 桩 runner，绝不触碰真实 $HOME、不触网。
-// 幂等：目标已存在且 package.json version 相同 → 跳过；不同 → 打印路径后整体替换。
+// 幂等：目标已存在且 package.json version 相同（且无未完成标记）→ 跳过；不同 → 打印
+// 路径后整体替换。安装中途失败：本次新建的目录整体回滚；替换旧版时无法廉价还原，
+// 写 .install-incomplete 标记——下次运行据此重试而非被「版本相同」误判为已完成。
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +21,8 @@ import { fileURLToPath } from 'node:url'
 const COPY_ENTRIES = ['SKILL.md', 'bin', 'src', 'packages', 'package.json']
 const COPY_README = /^README/
 const COPY_EXCLUDE = new Set(['node_modules', 'test', 'docs', '.git'])
+// 安装中途失败且无法回滚到旧版时留下的标记：版本相同跳过判定先看它，有标记则重试
+const INCOMPLETE_MARKER = '.install-incomplete'
 
 export const SKILL_ROOTS = [
   { id: 'claude', label: 'Claude Code', relative: '.claude/skills' },
@@ -63,7 +67,7 @@ function defaultNpmRunner(cwd) {
   return { ok: false, error: detail.split('\n').slice(-6).join('\n') }
 }
 
-function copySkillBody(sourceRoot, destDir) {
+function copySkillFiles(sourceRoot, destDir) {
   rmSync(destDir, { recursive: true, force: true })
   mkdirSync(destDir, { recursive: true })
   const keep = (src) => !COPY_EXCLUDE.has(path.basename(src))
@@ -80,6 +84,18 @@ function copySkillBody(sourceRoot, destDir) {
 }
 
 const indent = (s) => s.split('\n').map((l) => `       ${l}`).join('\n')
+
+// 失败收尾：本次新建的目录直接回滚（全量复制，无数据可失）；替换旧目录时无法廉价
+// 还原旧版，保留现场并写 .install-incomplete 标记，让下次运行重试而非误跳过。
+function failTarget(dest, destPreExisted, log) {
+  if (!destPreExisted) {
+    rmSync(dest, { recursive: true, force: true })
+    log(`   ↩️ 已回滚本次新建的目录（失败不留半成品）: ${dest}`)
+  } else {
+    writeFileSync(path.join(dest, INCOMPLETE_MARKER), `incomplete install at ${new Date().toISOString()}\n`)
+    log(`   ⚠️ 已保留原目录并写入标记 ${INCOMPLETE_MARKER}——下次运行将重试而非跳过`)
+  }
+}
 
 /**
  * 安装 skill 本体到所有已存在的 skills 根；四个都不存在时创建 ~/.agents/skills 并装入。
@@ -114,19 +130,23 @@ export function installSkill(options = {}) {
   for (const t of targets) {
     const dest = path.join(t.root, 'code-atlas')
     const destVersion = readVersion(path.join(dest, 'package.json'))
-    if (destVersion && destVersion === version) {
+    const incomplete = existsSync(path.join(dest, INCOMPLETE_MARKER))
+    if (destVersion && destVersion === version && !incomplete) {
       log(`⏭️  跳过 ${dest}（版本相同 v${destVersion}）`)
       summary.push({ root: t.root, dest, status: 'skipped', version: destVersion })
       continue
     }
-    if (isDir(dest)) log(`🔄 将替换 ${dest}（现有 v${destVersion || '?'} → v${version}）`)
+    const destPreExisted = isDir(dest)
+    if (incomplete) log(`♻️ 重试未完成的安装 ${dest}（目标 v${version}）`)
+    else if (destPreExisted) log(`🔄 将替换 ${dest}（现有 v${destVersion || '?'} → v${version}）`)
     else log(`📦 安装到 ${dest}`)
     try {
-      copySkillBody(sourceRoot, dest)
+      copySkillFiles(sourceRoot, dest)
       log('   ✔ 已复制 skill 本体（SKILL.md + bin/ + src/ + packages/ + package.json + README*，'
         + '排除 node_modules/test/docs/.git）')
     } catch (e) {
       log(`   ❌ 复制失败: ${e.message}`)
+      failTarget(dest, destPreExisted, log)
       summary.push({ root: t.root, dest, status: 'failed', reason: `复制失败: ${e.message}` })
       continue
     }
@@ -134,6 +154,7 @@ export function installSkill(options = {}) {
     const npmResult = runNpmInstall(dest)
     if (!npmResult.ok) {
       log(`   ❌ npm install 失败（该目标放弃，继续其余目标）:\n${indent(npmResult.error || '')}`)
+      failTarget(dest, destPreExisted, log)
       summary.push({ root: t.root, dest, status: 'failed', reason: 'npm install 失败' })
       continue
     }
