@@ -21,6 +21,7 @@ const SUPPORTED_LANGUAGES = [
 function showHelp(argv0) {
   const self = path.basename(String(argv0))
   console.log(`Usage: ${self} [OPTIONS]
+       ${self} install
 
 High-performance Multi-Stack AST Repo Map Generator using ast-grep.
 Supports: React/TS/TSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (Swift/C/C++).
@@ -38,6 +39,12 @@ Supports: React/TS/TSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (
   - 🔗 区对可证实的外部依赖（dart:* / package:非self / node_modules 可证实的 JS 裸包名）
     折叠 importer 名单为 "(N importers, external)"；具体引用文件可在 🌐 区 grep 模块名获得
 
+Subcommands:
+  install               Install this skill into every detected agent skills directory
+                        (~/.claude/skills, ~/.agents/skills, ~/.codex/skills,
+                        ~/.config/opencode/skills; if none exists, creates ~/.agents/skills).
+                        Idempotent: an existing same-version target is skipped.
+
 Options:
   -d, --dir <path>       Target source directory to scan (default: current directory '.')
   -o, --output <file>    Output markdown file path (default: <target_dir>/.repo_map_<name>.md)
@@ -53,6 +60,7 @@ Options:
   -h, --help             Show this help message
 
 Examples:
+  ${self} install
   ./bin/code-atlas.mjs -d ./admin-web -n frontend
   ./bin/code-atlas.mjs -d ./backend -n backend -o ./docs/backend_map.md
   ./bin/code-atlas.mjs -d ./flutter_app -n flutter
@@ -154,6 +162,11 @@ export function resolveScanConfig(opts) {
 }
 
 export async function main(argv, argv0 = fileURLToPath(import.meta.url)) {
+  if (argv[0] === 'install') {
+    const { installSkill } = await import('../src/install.mjs')
+    process.exitCode = installSkill().code
+    return
+  }
   const opts = parseArgs(argv, argv0)
   // 与 Bash 版一致：merge 模式也先做目录与 --languages 校验
   const cfg = resolveScanConfig(opts)
