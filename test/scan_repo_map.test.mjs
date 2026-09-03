@@ -142,6 +142,15 @@ export const load = async () => {
   return t;
 };
 `)
+  // 路由行 fixture（extract_route 区间行断言用）
+  writeFileSync(path.join(SRC, 'tsapp/routes.ts'), `import { fetchTracks } from './types';
+
+function greet(): string {
+  return 'hi';
+}
+
+app.get('/greet', greet);
+`)
   writeFileSync(path.join(SRC, 'gosrc/main.go'), `package main
 import "fmt"
 type Track struct {
@@ -173,6 +182,15 @@ async function main() {
   expectOk('Dart 扫描成功', '-d', path.join(SRC, 'dartlib'), '-n', 'dartlib', '-o', w('dart_symbols/sym.md'))
   expectGrep('class AudioTrack 在符号区', '^📁 models/audio_track\\.dart \\[.*\\] class AudioTrack$', w('dart_symbols/sym.md'))
   expectGrep('method play 在符号区', '^📁 models/playable\\.dart \\[.*\\] method play$', w('dart_symbols/sym.md'))
+
+  // 1b. 区间符号行（v2.1.0）：多行 class / 单行 symbol / route 行区间；import 行保持 [L<n>]
+  info('interval_symbols')
+  expectOk('全量扫描成功', '-d', SRC, '-n', 'all', '-o', w('interval_symbols/m.md'))
+  expectGrep('多行 class 区间精确', '^📁 dartlib/models/playable\\.dart \\[L1-L5\\] class Playable$', w('interval_symbols/m.md'))
+  expectGrep('单行 symbol 为 [Ln-Ln] 形式', '^📁 dartlib/models/playable\\.dart \\[L4-L4\\] method play$', w('interval_symbols/m.md'))
+  expectGrep('route 行为区间形式', "^📁 tsapp/routes\\.ts \\[L7-L7\\] http-get '/greet' → greet$", w('interval_symbols/m.md'))
+  expectGrep('多行函数区间精确', '^📁 tsapp/routes\\.ts \\[L3-L5\\] func greet$', w('interval_symbols/m.md'))
+  expectGrep('import 行保持 [Ln] 单值形式', '^📁 tsapp/index\\.ts \\[L1\\] imports\\(1\\): tsapp/types\\.ts$', w('interval_symbols/m.md'))
 
   // 2. Dart package:self 导入归一化
   info('dart_package_self')

@@ -54,6 +54,11 @@ const CASES = [
   },
 ]
 
+// 剥离符号行区间列（v2.1.0 演进列）：本测试只关心文件发现语义，与 golden.sh 同一变换
+function stripIntervals(lines) {
+  return lines.map((l) => l.replace(/\[L([0-9]+)-L[0-9]+\]/g, '[L$1]'))
+}
+
 function runBoth(caseDir, outDir) {
   const a = path.join(outDir, 'a.md')
   const b = path.join(outDir, 'b.md')
@@ -78,7 +83,7 @@ function main() {
       continue
     }
     const na = normalizeMap(a)
-    const nb = normalizeMap(b)
+    const nb = stripIntervals(normalizeMap(b))
     if (JSON.stringify(na) === JSON.stringify(nb)) ok('Node 与 Bash 输出 normalize 后逐字节一致')
     else {
       fail('Node 与 Bash 输出不一致')
