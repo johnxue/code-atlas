@@ -5,9 +5,11 @@
 # 验收红线：Node v2.1.0 输出经剥掉区间列（[Ls-Le] → [Ls]）后，与 Bash 版
 # （wisdom_app 仓，只读，冻结在 v1.7.0）同参输出 normalize 后 diff 必须为空——
 # 证明符号区演进只加了区间列、零行为漂移。
-# 快照：test/golden/snapshot/*.md 保存 v2.1.0 原文（剥离前），首次缺失时自动
-# 录入；`--snapshot` 显式对当前输出对快照 diff 防回归——仓库或扫描器演进后
-# 属预期失败，需 rm 快照后有意识重录。
+# 快照：test/golden/snapshot/*.md 保存 v2.1.0 原文（剥离前）。默认运行即校验
+# 已入库快照（缺失 → 明确报错非零退出，不自动录入）；录入为显式操作：
+#   bash test/golden.sh --record-snapshot
+# 仓库或扫描器演进后快照属预期失败，重录前先确认漂移是有意的。
+# `--snapshot` 为兼容别名（默认已含快照校验）。
 # 连续执行两版（同一代码快照），避免 worktree 变化造成假差异。
 # ==============================================================================
 set -u
@@ -18,8 +20,13 @@ SNAPSHOT_DIR="$(cd "$(dirname "$0")" && pwd)/golden/snapshot"
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
-WITH_SNAPSHOT=0
-[[ "${1:-}" == "--snapshot" ]] && WITH_SNAPSHOT=1
+MODE=verify
+case "${1:-}" in
+  --record-snapshot) MODE=record ;;
+  --snapshot) MODE=verify ;;   # 兼容别名：默认即含快照校验
+  '') ;;
+  *) echo "用法: test/golden.sh [--record-snapshot|--snapshot]"; exit 2 ;;
+esac
 
 # 头部 normalize（与 test/helpers.mjs 等价）：删易变行与空行。无参数时读 stdin。
 normalize() {
@@ -62,19 +69,20 @@ for entry in "${GOLDENS[@]}"; do
     cat "$OUT/diff.txt"
     rc=1
   fi
-  # 快照基线：缺失时录入原文；--snapshot 时对快照 diff 防回归
-  if [[ ! -f "$SNAPSHOT_DIR/$snap" ]]; then
+  # 快照：默认校验已入库快照；--record-snapshot 显式录入
+  if [[ "$MODE" == "record" ]]; then
     mkdir -p "$SNAPSHOT_DIR"
     cp "$OUT/b.md" "$SNAPSHOT_DIR/$snap"
     echo "📸 快照已录入：$SNAPSHOT_DIR/$snap"
-  elif [[ "$WITH_SNAPSHOT" == "1" ]]; then
-    if diff -u <(normalize "$SNAPSHOT_DIR/$snap") <(normalize "$OUT/b.md") >"$OUT/snapdiff.txt"; then
-      echo "✅ 快照一致：$SNAPSHOT_DIR/$snap"
-    else
-      echo "❌ 与快照不一致（仓库或扫描器演进后属预期，需 rm 快照后有意识重录）："
-      cat "$OUT/snapdiff.txt"
-      rc=1
-    fi
+  elif [[ ! -f "$SNAPSHOT_DIR/$snap" ]]; then
+    echo "❌ 快照缺失：$SNAPSHOT_DIR/$snap（请运行 bash test/golden.sh --record-snapshot 录入）"
+    rc=1
+  elif diff -u <(normalize "$SNAPSHOT_DIR/$snap") <(normalize "$OUT/b.md") >"$OUT/snapdiff.txt"; then
+    echo "✅ 快照一致：$SNAPSHOT_DIR/$snap"
+  else
+    echo "❌ 与快照不一致（仓库或扫描器演进后属预期，确认漂移有意后用 --record-snapshot 重录）："
+    cat "$OUT/snapdiff.txt"
+    rc=1
   fi
 done
 exit $rc
