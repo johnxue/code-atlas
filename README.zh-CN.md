@@ -103,7 +103,36 @@ Agent 会自行触发 `code-atlas` skill：扫描（或复用新鲜地图）、g
 
 ## 6. 开发（其它）
 
-CLI 参数（与 Bash 旧版一致）：`-d/-o/-n/-x/-e/-m/--languages/--merge/-v/-h`，见 `--help`。
+### CLI 参考
+
+```bash
+# 扫描目录
+node bin/code-atlas.mjs -d <目录> [-n <名称>] [-o <输出.md>] [-x] [-e <glob>...] \
+    [-m <行数>] [--languages <csv>]
+# 合并多份地图
+node bin/code-atlas.mjs --merge a.md b.md ... -o combined.md
+# 安装 skill 到各 Agent 的 skills 目录
+node bin/code-atlas.mjs install
+```
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `-d, --dir <路径>` | 要扫描的目录 | `.` |
+| `-o, --output <文件>` | 输出地图文件 | `<dir>/.repo_map_<name>.md` |
+| `-n, --name <名称>` | 地图头部项目名 | 目录名 |
+| `-x, --no-crosslayer` | 跳过 🔗 跨层反向引用区 | 关 |
+| `-e, --exclude <glob>` | 额外忽略规则（可重复） | — |
+| `-m, --max-lines <n>` | 跳过超过 n 行的文件 | 引擎默认 |
+| `--languages <csv>` | 限定语言；取值：`typescript,javascript,tsx,python,go,dart,kotlin,java,swift,c,cpp` | 全部 |
+| `--merge` | 合并模式：合并已有地图文件 | 关 |
+| `-v, --version` | 打印版本 | — |
+| `-h, --help` | 打印帮助 | — |
+
+```bash
+node bin/code-atlas.mjs -d ./lib -n app -o docs/ast-maps/app.md
+node bin/code-atlas.mjs -d ./lib -n app -o map.md --languages dart -x
+node bin/code-atlas.mjs --merge docs/ast-maps/a.md docs/ast-maps/b.md -o docs/ast-maps/all.md
+```
 
 ```bash
 npm test        # fixture 断言 + 规则清单 parity + gitignore 对拍

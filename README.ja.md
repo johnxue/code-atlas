@@ -111,7 +111,36 @@ Agent が `code-atlas` スキルを自動で起動し、スキャン（または
 
 ## 6. 開発（その他）
 
-CLI フラグ（旧 Bash 版と同一）：`-d/-o/-n/-x/-e/-m/--languages/--merge/-v/-h`、`--help` 参照。
+### CLI リファレンス
+
+```bash
+# ディレクトリをスキャン
+node bin/code-atlas.mjs -d <dir> [-n <name>] [-o <output.md>] [-x] [-e <glob>...] \
+    [-m <lines>] [--languages <csv>]
+# 複数の地図をマージ
+node bin/code-atlas.mjs --merge a.md b.md ... -o combined.md
+# 各 Agent の skills ディレクトリへ skill をインストール
+node bin/code-atlas.mjs install
+```
+
+| フラグ | 説明 | デフォルト |
+| --- | --- | --- |
+| `-d, --dir <path>` | スキャン対象ディレクトリ | `.` |
+| `-o, --output <file>` | 出力地図ファイル | `<dir>/.repo_map_<name>.md` |
+| `-n, --name <name>` | 地図ヘッダのプロジェクト名 | ディレクトリ名 |
+| `-x, --no-crosslayer` | 🔗 クロスレイヤ逆参照セクションを省略 | オフ |
+| `-e, --exclude <glob>` | 追加の除外 glob（繰り返し可） | — |
+| `-m, --max-lines <n>` | n 行を超えるファイルをスキップ | エンジン既定 |
+| `--languages <csv>` | 言語を限定；値：`typescript,javascript,tsx,python,go,dart,kotlin,java,swift,c,cpp` | すべて |
+| `--merge` | マージモード：既存の地図ファイルを結合 | オフ |
+| `-v, --version` | バージョン表示 | — |
+| `-h, --help` | ヘルプ表示 | — |
+
+```bash
+node bin/code-atlas.mjs -d ./lib -n app -o docs/ast-maps/app.md
+node bin/code-atlas.mjs -d ./lib -n app -o map.md --languages dart -x
+node bin/code-atlas.mjs --merge docs/ast-maps/a.md docs/ast-maps/b.md -o docs/ast-maps/all.md
+```
 
 ```bash
 npm test        # fixture アサーション + ルール定義パリティ + gitignore 対拍

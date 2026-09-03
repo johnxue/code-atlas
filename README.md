@@ -109,8 +109,36 @@ symbol, only the most specific survives.
 
 ## 6. Development
 
-CLI flags (identical to the legacy Bash scanner): `-d/-o/-n/-x/-e/-m/--languages/--merge/-v/-h`
-— see `--help`.
+### CLI reference
+
+```bash
+# scan a directory
+node bin/code-atlas.mjs -d <dir> [-n <name>] [-o <output.md>] [-x] [-e <glob>...] \
+    [-m <lines>] [--languages <csv>]
+# merge several maps into one
+node bin/code-atlas.mjs --merge a.md b.md ... -o combined.md
+# provision the skill into agent skills directories
+node bin/code-atlas.mjs install
+```
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `-d, --dir <path>` | Directory to scan | `.` |
+| `-o, --output <file>` | Output map file | `<dir>/.repo_map_<name>.md` |
+| `-n, --name <name>` | Project name in the map header | directory name |
+| `-x, --no-crosslayer` | Skip the 🔗 cross-layer reverse-reference section | off |
+| `-e, --exclude <glob>` | Extra ignore glob (repeatable) | — |
+| `-m, --max-lines <n>` | Skip files larger than n lines | engine default |
+| `--languages <csv>` | Restrict languages; values: `typescript,javascript,tsx,python,go,dart,kotlin,java,swift,c,cpp` | all |
+| `--merge` | Merge mode: combine existing map files | off |
+| `-v, --version` | Print version | — |
+| `-h, --help` | Print help | — |
+
+```bash
+node bin/code-atlas.mjs -d ./lib -n app -o docs/ast-maps/app.md
+node bin/code-atlas.mjs -d ./lib -n app -o map.md --languages dart -x
+node bin/code-atlas.mjs --merge docs/ast-maps/a.md docs/ast-maps/b.md -o docs/ast-maps/all.md
+```
 
 ```bash
 npm test        # fixture assertions + rule-manifest parity + gitignore parity
