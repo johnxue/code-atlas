@@ -17,7 +17,7 @@ Hermes）向けの **skill** です。リポジトリを一度スキャンして
 - **システム依存ゼロ**：`npm install` 一度きり。LSP もインデックスサーバも、
   jq/perl/ast-grep CLI のインストールも不要（AST エンジンと全言語文法は prebuild 付き
   npm パッケージとして同梱）；
-- **9 言語対応**：TypeScript/JavaScript/TSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++；
+- **9 言語対応**：TypeScript/JavaScript/TSX/JSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++；
 - **フレッシュネス内蔵**：すべての地図に Source Commit と Worktree 状態を記録。
   いつ再スキャンすべきかを Agent が判断できます。
 

@@ -24,7 +24,7 @@ function showHelp(argv0) {
        ${self} install
 
 High-performance Multi-Stack AST Repo Map Generator using ast-grep.
-Supports: React/TS/TSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (Swift/C/C++).
+Supports: React/TS/TSX/JSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (Swift/C/C++).
 
 已知限制:
   - Vue (.vue SFC) 与 Objective-C (.m/.mm) 无 tree-sitter 语法，ast-grep 无法解析，不索引

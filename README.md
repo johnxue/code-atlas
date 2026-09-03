@@ -16,7 +16,7 @@ answers locate-style questions with a `grep` on the map instead of reading files
 - **Token-cheap by design**: the map is the index; the agent reads only the lines the map points to.
 - **Zero system dependencies**: one `npm install`. No LSP, no indexing server, no jq/perl/ast-grep
   CLI to install (the AST engine and all language grammars ship as npm packages with prebuilds).
-- **9 languages**: TypeScript/JavaScript/TSX, Python, Go, Dart/Flutter, Kotlin/Java/Android, Swift, C/C++.
+- **9 languages**: TypeScript/JavaScript/TSX/JSX, Python, Go, Dart/Flutter, Kotlin/Java/Android, Swift, C/C++.
 - **Freshness built in**: every map carries the source commit and worktree state, so the agent
   knows when to rescan.
 

@@ -1,6 +1,6 @@
 ---
 name: code-atlas
-description: Code Atlas — generate and grep an AST repo map. Use when locating where a feature is implemented, finding a symbol's file and line range, analyzing the blast radius of a change via reverse references, finding API route definitions and call sites, or checking map freshness / rescanning. 在代码库中找功能实现、查符号定义、看改动影响面、找 API 端点时用。機能の実装場所を探す、シンボル定義、変更の影響範囲、API エンドポイント検索に使う。Supports TS/JS/TSX, Python, Go, Dart/Flutter, Kotlin/Java/Android, Swift, C/C++. Slash commands: /code-atlas build, /code-atlas check, /code-atlas merge (recipes below).
+description: Code Atlas — generate and grep an AST repo map. Use when locating where a feature is implemented, finding a symbol's file and line range, analyzing the blast radius of a change via reverse references, finding API route definitions and call sites, or checking map freshness / rescanning. 在代码库中找功能实现、查符号定义、看改动影响面、找 API 端点时用。機能の実装場所を探す、シンボル定義、変更の影響範囲、API エンドポイント検索に使う。Supports TS/JS/TSX/JSX, Python, Go, Dart/Flutter, Kotlin/Java/Android, Swift, C/C++. Slash commands: /code-atlas build, /code-atlas check, /code-atlas merge (recipes below).
 ---
 
 # Code Atlas

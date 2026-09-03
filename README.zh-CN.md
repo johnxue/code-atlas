@@ -16,7 +16,7 @@ Hermes）的 **skill**。它把仓库一次性扫描成一份 Markdown 地图—
 - **为省 token 而生**：地图即索引，Agent 只读地图指到的那几行；
 - **零系统依赖**：一次 `npm install` 即可，无需 LSP、索引服务，也无需安装
   jq/perl/ast-grep CLI（AST 引擎与全部语言语法以 npm 包 + prebuild 形式随包分发）；
-- **9 种语言**：TypeScript/JavaScript/TSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++；
+- **9 种语言**：TypeScript/JavaScript/TSX/JSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++；
 - **内建新鲜度**：每份地图带 Source Commit 与 Worktree 状态，Agent 知道何时该重扫。
 
 ```bash
