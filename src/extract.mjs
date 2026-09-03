@@ -60,7 +60,7 @@ function relPath(targetDirAbs, abs) {
 
 const PATTERN_ERROR_MSG = 'Warning: Pattern contains an ERROR node and may cause unexpected results.'
 
-// extract_symbols <lang> <pattern> <prefix>
+// extract_symbols <lang> <pattern> <prefix>：符号区行恒为区间形式 [L<start>-L<end>]
 export function extractSymbols(engine, ctx, rule) {
   const { lang, pattern, label } = rule
   if (!engine.hasLanguage(lang)) return
@@ -71,12 +71,13 @@ export function extractSymbols(engine, ctx, rule) {
   for (const { file, node } of matches) {
     const rel = relPath(ctx.targetDirAbs, file)
     const line = node.range().start.line + 1
+    const endLine = node.range().end.line + 1
     const name = node.getMatch('NAME')?.text() ?? 'anonymous'
-    ctx.symbols.push(`📁 ${rel} [L${line}] ${label} ${name}`)
+    ctx.symbols.push(`📁 ${rel} [L${line}-L${endLine}] ${label} ${name}`)
   }
 }
 
-// extract_route <lang> <pattern> <prefix>：PATH → Handler 保留 API 语义
+// extract_route <lang> <pattern> <prefix>：PATH → Handler 保留 API 语义（写入符号区，同为区间行）
 export function extractRoute(engine, ctx, rule) {
   const { lang, pattern, label } = rule
   if (!engine.hasLanguage(lang)) return
@@ -87,9 +88,10 @@ export function extractRoute(engine, ctx, rule) {
   for (const { file, node } of matches) {
     const rel = relPath(ctx.targetDirAbs, file)
     const line = node.range().start.line + 1
+    const endLine = node.range().end.line + 1
     const p = node.getMatch('PATH')?.text() ?? '?'
     const name = node.getMatch('NAME')?.text() ?? 'anonymous'
-    ctx.symbols.push(`📁 ${rel} [L${line}] ${label} ${p} → ${name}`)
+    ctx.symbols.push(`📁 ${rel} [L${line}-L${endLine}] ${label} ${p} → ${name}`)
   }
 }
 
@@ -102,8 +104,9 @@ export function extractKinds(engine, ctx, rule) {
   for (const { file, node } of matches) {
     const rel = relPath(ctx.targetDirAbs, file)
     const line = node.range().start.line + 1
+    const endLine = node.range().end.line + 1
     const lbl = auto ? autoKindLabel(node.text()) : label
-    ctx.symbols.push(`📁 ${rel} [L${line}] ${lbl} ${symname(node.text())}`)
+    ctx.symbols.push(`📁 ${rel} [L${line}-L${endLine}] ${lbl} ${symname(node.text())}`)
   }
 }
 
@@ -116,10 +119,11 @@ export function extractKindJq(engine, ctx, rule) {
   for (const { file, node } of matches) {
     const rel = relPath(ctx.targetDirAbs, file)
     const line0 = node.range().start.line
+    const endLine0 = node.range().end.line
     if (jq === 'classlike') {
-      ctx.symbols.push(classlikeLine(jqLang ?? lang, rel, line0, node.text()))
+      ctx.symbols.push(classlikeLine(jqLang ?? lang, rel, line0, endLine0, node.text()))
     } else {
-      ctx.symbols.push(dartTopvarLine(rel, line0, node.text()))
+      ctx.symbols.push(dartTopvarLine(rel, line0, endLine0, node.text()))
     }
   }
 }

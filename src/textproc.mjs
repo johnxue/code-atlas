@@ -72,8 +72,10 @@ function classlikeLabel(lang, kw, decl, ann) {
   return 'class'
 }
 
-// 返回符号行 `📁 <rel> [L<ln>] <label> <name>`（无匹配时 kw=""、n="?"、off=0，照 jq 语义）
-export function classlikeLine(lang, rel, startLine0, nodeText) {
+// 返回符号行 `📁 <rel> [L<start>-L<end>] <label> <name>`
+// （start = 节点起始行 + 关键字前偏移修正；end = 节点结束行；均 1 基。
+//   无匹配时 kw=""、n="?"、off=0，照 jq 语义）
+export function classlikeLine(lang, rel, startLine0, endLine0, nodeText) {
   const re = CLASSLIKE_KWRE[lang] ?? CLASSLIKE_KWRE.dart
   const m = re.exec(nodeText)
   let kw = ''
@@ -88,18 +90,18 @@ export function classlikeLine(lang, rel, startLine0, nodeText) {
   const ann = nodeText.slice(0, off)
   const label = classlikeLabel(lang, kw, decl, ann)
   const newlines = nodeText.slice(0, off).split('\n').length - 1
-  return `📁 ${rel} [L${startLine0 + 1 + newlines}] ${label} ${n}`
+  return `📁 ${rel} [L${startLine0 + 1 + newlines}-L${endLine0 + 1}] ${label} ${n}`
 }
 
 // ----------------------------------------------------------------
 // dart_topvar.jq：Riverpod provider 打标的顶层变量
 // ----------------------------------------------------------------
-export function dartTopvarLine(rel, startLine0, nodeText) {
+export function dartTopvarLine(rel, startLine0, endLine0, nodeText) {
   let head = nodeText.split('=')[0].split(';')[0]
   head = trimWs(collapseWs(head))
   const nm = /[A-Za-z_0-9]$/.test(head) ? head.split(' ').pop() : '?'
   const label = /Provider/.test(nodeText) ? 'provider' : 'top-var'
-  return `📁 ${rel} [L${startLine0 + 1}] ${label} ${nm}`
+  return `📁 ${rel} [L${startLine0 + 1}-L${endLine0 + 1}] ${label} ${nm}`
 }
 
 // ----------------------------------------------------------------

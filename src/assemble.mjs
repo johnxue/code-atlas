@@ -7,7 +7,9 @@
 
 import { collapseExternalLines } from './normalize.mjs'
 
-export const SYMBOL_ROW_RE = /^📁 (.*) \[L(\d+)\] (\S+) (.*)$/
+// 符号行区间列：v2.1.0 起恒为 [L<start>-L<end>]；(?:-L(\d+))? 为解析宽容——
+// merge 可能吃进 Bash v1.7.0 生成的旧单行格式 [Ln]（视为 start==end），不是兼容层。
+export const SYMBOL_ROW_RE = /^📁 (.*) \[L(\d+)(?:-L(\d+))?\] (\S+) (.*)$/
 export const IMPORT_ROW_RE = /^📁 (.*) \[L(\d+)\] import (.*)$/
 export const API_ROW_RE = /^📁 (.*) \[L(\d+)\] (api-\S+) (.*)$/
 
@@ -52,12 +54,13 @@ const LABEL_PRIORITY = [
 ]
 const PRIO = new Map(LABEL_PRIORITY.map((l, i) => [l, LABEL_PRIORITY.length - 1 - i]))
 
-// assemble_symbols：排序 → 同 (路径,行号,名字) 去重（更具体标签优先）→ 可选截断
+// assemble_symbols：排序 → 同 (路径,start行,名字) 去重（更具体标签优先）→ 可选截断。
+// 排序/去重键取 start 行；输出保留原始行文本（区间列原样）。
 export function assembleSymbols(lines, maxLines) {
   const rows = lines.map((raw) => {
     const m = raw.match(SYMBOL_ROW_RE)
     if (!m) return { raw, f: raw, ln: 0, label: '', name: '' }
-    return { raw, f: m[1], ln: Number(m[2]), label: m[3], name: m[4] }
+    return { raw, f: m[1], ln: Number(m[2]), label: m[4], name: m[5] }
   })
   rows.sort(rowComparator)
   const out = []
@@ -140,7 +143,7 @@ export function fileExports(symbolLines, excludes) {
   for (const raw of excludeRows(symbolLines, excludes)) {
     const m = raw.match(SYMBOL_ROW_RE)
     if (!m) continue
-    rows.push({ f: m[1], name: m[4], raw: `${m[1]}\t${m[4]}` })
+    rows.push({ f: m[1], name: m[5], raw: `${m[1]}\t${m[5]}` })
   }
   // sort -k1,1：路径字节序，tie-break 整行（= name 序）
   rows.sort((a, b) => {
