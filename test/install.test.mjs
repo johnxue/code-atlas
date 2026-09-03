@@ -9,7 +9,7 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -271,6 +271,60 @@ function main() {
     assert('报错路径未发生任何安装', !existsSync(path.join(home, '.claude'))
       && !existsSync(path.join(home, '.agents')))
     rmSync(home, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
+  section('non_dir_dest_is_preserved')
+  {
+    // 场景 1：普通文件占位 → 报错保留、计入失败、继续其余目标、整体退出码 1
+    const home = fakeHome()
+    makeRoots(home, ['claude', 'agents'])
+    const fileDest = destOf(home, 'claude')
+    writeFileSync(fileDest, 'precious user file\n')
+    const npm = stubNpm()
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const byDest = Object.fromEntries(summary.map((s) => [s.dest, s]))
+    assert('文件占位 → 整体退出码 1', code === 1)
+    assert('文件占位 → 状态 failed 且注明非目录占用',
+      byDest[fileDest].status === 'failed' && byDest[fileDest].reason.includes('非目录'))
+    assert('普通文件内容原样保留',
+      readFileSync(fileDest, 'utf8') === 'precious user file\n')
+    assert('其余目标照常安装（继续而非中止）',
+      byDest[destOf(home, 'agents')].status === 'installed')
+    assert('占位目标未触发任何 npm install',
+      npm.calls.length === 1 && npm.calls[0] === destOf(home, 'agents'))
+    rmSync(home, { recursive: true, force: true })
+
+    // 场景 2：软链指向目录（lstat 不跟随 → 按占用报错，软链与其目标都原样保留）
+    const home2 = fakeHome()
+    makeRoots(home2, ['claude'])
+    const linkDest = destOf(home2, 'claude')
+    const real = path.join(home2, 'elsewhere', 'my-code-atlas')
+    mkdirSync(real, { recursive: true })
+    writeFileSync(path.join(real, 'keep.txt'), 'inside symlink target')
+    symlinkSync(real, linkDest)
+    const r2 = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: stubNpm().run })
+    assert('目录软链占位 → failed 且整体退出码 1',
+      r2.code === 1 && r2.summary[0].status === 'failed')
+    assert('目录软链占位 → reason 注明 symlink',
+      r2.summary[0].reason.includes('symlink'))
+    assert('软链本身原样保留（lstat 仍为 symlink）',
+      lstatSync(linkDest).isSymbolicLink())
+    assert('软链目标目录内容未被动过',
+      readFileSync(path.join(real, 'keep.txt'), 'utf8') === 'inside symlink target')
+    rmSync(home2, { recursive: true, force: true })
+
+    // 场景 3：悬空软链（existsSync 为 false，lstat 仍存在 → 也按占用保护）
+    const home3 = fakeHome()
+    makeRoots(home3, ['claude'])
+    const dangling = destOf(home3, 'claude')
+    symlinkSync(path.join(home3, 'nowhere'), dangling)
+    const r3 = installSkill({ homedir: home3, log: NOLOG, runNpmInstall: stubNpm().run })
+    assert('悬空软链占位 → failed（existsSync 看不见但 lstat 看得见）',
+      r3.code === 1 && r3.summary[0].status === 'failed')
+    assert('悬空软链原样保留',
+      lstatSync(dangling).isSymbolicLink())
+    rmSync(home3, { recursive: true, force: true })
   }
 
   console.log('\n========================================')

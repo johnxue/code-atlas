@@ -11,7 +11,7 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -43,6 +43,19 @@ function isDir(p) {
     return statSync(p).isDirectory()
   } catch {
     return false
+  }
+}
+
+// lstat 语义区分 dest 现状（不跟随软链）：absent=不存在；dir=目录；
+// other=普通文件/软链等占位——一律保留不动、报错计入失败。
+function classifyDest(p) {
+  try {
+    const st = lstatSync(p)
+    if (st.isDirectory()) return { kind: 'dir' }
+    const type = st.isSymbolicLink() ? 'symlink' : st.isFile() ? 'regular file' : 'other'
+    return { kind: 'other', type }
+  } catch {
+    return { kind: 'absent' }
   }
 }
 
@@ -129,14 +142,20 @@ export function installSkill(options = {}) {
   const summary = []
   for (const t of targets) {
     const dest = path.join(t.root, 'code-atlas')
-    const destVersion = readVersion(path.join(dest, 'package.json'))
-    const incomplete = existsSync(path.join(dest, INCOMPLETE_MARKER))
+    const cur = classifyDest(dest)
+    if (cur.kind === 'other') {
+      log(`❌ 目标位置已被非目录占用，为防误删不做任何改动: ${dest}（类型: ${cur.type}）`)
+      summary.push({ root: t.root, dest, status: 'failed', reason: `目标位置被非目录占用（${cur.type}）` })
+      continue
+    }
+    const destVersion = cur.kind === 'dir' ? readVersion(path.join(dest, 'package.json')) : ''
+    const incomplete = cur.kind === 'dir' && existsSync(path.join(dest, INCOMPLETE_MARKER))
     if (destVersion && destVersion === version && !incomplete) {
       log(`⏭️  跳过 ${dest}（版本相同 v${destVersion}）`)
       summary.push({ root: t.root, dest, status: 'skipped', version: destVersion })
       continue
     }
-    const destPreExisted = isDir(dest)
+    const destPreExisted = cur.kind === 'dir'
     if (incomplete) log(`♻️ 重试未完成的安装 ${dest}（目标 v${version}）`)
     else if (destPreExisted) log(`🔄 将替换 ${dest}（现有 v${destVersion || '?'} → v${version}）`)
     else log(`📦 安装到 ${dest}`)
