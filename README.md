@@ -42,6 +42,45 @@ node bin/scan_repo_map.mjs --merge a.md b.md -n all -o all.md
 
 CLI 参数与 Bash 版完全一致（-d/-o/-n/-x/-e/-m/--languages/--merge/-v/-h）。
 
+## 地图分区结构与检索模式
+
+| 区 | 行形态 | 回答的问题 | 检索方式 |
+|---|---|---|---|
+| 符号区 | `📁 <relpath> [L起-L止] <标签> <名称>` | X 定义在哪 | `grep 'class AuthRepository' map.md` → `read 文件:L起-L止` |
+| 🌐 导入图谱 | `📁 <file> imports(k): a, b…` | 文件依赖什么 | `grep '^📁 <file>' map.md` |
+| 🚪 文件符号清单 | `🚪 <file> exports(k): n1, n2…` | 哪个文件有某符号（含私有） | `grep 'exports(.*<名称>' map.md` |
+| 🔗 反向引用 | `🔗 <模块> (k importers): f1…` | 改它影响谁 | `grep '^🔗 <模块>' map.md` |
+| 📡 API 路径 | `api-route` 定义 / `api-call` 调用点 | 前后端路由对应 | 跨端 grep 同一路径字面量 |
+
+空区自动省略。**组合跳转示例**——"某页面的数据从哪来、改字段影响谁"：
+
+1. `grep '<PageName>' map.md` → 拿到文件与行区间；
+2. `grep '^📁 <该文件> imports'` → 见其 providers/controllers 依赖；
+3. `grep '^🔗 <controller/repository 路径>'` → 拿到全部调用方（影响面）；
+4. 命中后才 `read` 具体文件。
+
+## 标签速查（符号区）
+
+`class/abstract-class/final-class/sealed-class/interface/enum/method/func/async-func`、
+`provider/top-var/const`、`react-component/custom-hook/composable`、
+`nest-controller/nest-service/typeorm-entity/room-entity/room-dao/hilt-module`、
+`api-route/api-call/api-get/api-post/…`、`gin-handler/gin-middleware`、
+`c-struct/cpp-class/cpp-func` 等。同符号命中多个标签时只保留最具体者。
+
+## 已知限制
+
+- **Vue (.vue) / Objective-C**：无 tree-sitter 语法，不索引（检测到 .vue 会告警）。
+- **Dart api-call 为行级启发式**：跨多行调用、动态拼接 URL 可能遗漏。
+- **启发式标签**（api-route/api-call、zustand-store 等）：命中 ≠ 100% 语义，
+  遵守"地图定位 + 代码确认"两步。
+- **导入归一化**：相对路径 / Python 点式 / Dart `package:self` 解析为仓库相对路径后聚合；
+  TS 别名（`@/`、`~/`）不解析，按原字符串聚合。
+- **🔗 外部依赖折叠**：`dart:*`、非 self `package:`、可证实的 JS 裸包名折叠为
+  `(N importers, external)`；查"谁在用某库"改从 🌐 区 `grep '<模块名>'`。
+- **无语义完备性**：地图不含调用图、字段读写图；不能据地图断言"全部调用方"。
+- **--merge 假定各输入同属一个 Source Path 根**；不同根合并会告警。
+
+
 ## 测试与对拍
 
 ```bash
