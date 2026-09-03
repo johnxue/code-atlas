@@ -1,12 +1,21 @@
 ---
-name: scan-repo-map
-description: AST 代码地图生成与检索。当需要在陌生/大型代码库中定位某个功能的实现、查符号定义所在文件与行区间、分析改动的反向引用影响面、检索 API 路由与调用点、或评估地图是否过期需要重扫时使用。支持 TS/JS/TSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++。
+name: code-atlas
+description: AST 代码地图（atlas）生成与检索。当需要在陌生/大型代码库中定位某个功能的实现、查符号定义所在文件与行区间、分析改动的反向引用影响面、检索 API 路由与调用点、或评估地图是否过期需要重扫时使用。支持 TS/JS/TSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++。
 ---
 
-# scan-repo-map
+# code-atlas
 
 生成并检索一个仓库的 AST 代码地图：一份带 freshness 头的 Markdown 索引，用 grep 定位代码，
 代替逐文件阅读。检索技巧见本目录 README.md（工具手册）；本文件只含执行步骤与地图语义。
+
+## 安装（首次）
+
+把本仓 clone 到 skills 目录并装依赖：
+```
+git clone <仓库地址> ~/.agents/skills/code-atlas && cd ~/.agents/skills/code-atlas && npm install
+```
+依赖收敛为 Node >= 18 一项；Dart 语法 prebuild 随包分发（macOS arm64/x64 免编译，
+Linux/Windows 由 CI 补齐前走 postinstall 现场编译，需 C 编译链）。
 
 ## 步骤
 

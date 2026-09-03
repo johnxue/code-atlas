@@ -1,6 +1,6 @@
 # scan_repo_map
 
-将 Bash 版 `scripts/scan_repo_map.sh`（位于 wisdom_app 仓库）重写为 Node.js + `@ast-grep/napi` 的项目，后续会封装为 agent skill。本仓库包含完整的 Node 版扫描器与 ast-grep 动态语言包。
+将 Bash 版 `scripts/scan_repo_map.sh`（位于 wisdom_app 仓库）重写为 Node.js + `@ast-grep/napi` 的项目。本仓根目录即 agent skill **code-atlas**（见 SKILL.md），同时包含完整的 Node 版扫描器与 ast-grep 动态语言包。
 
 ## 目录结构
 
