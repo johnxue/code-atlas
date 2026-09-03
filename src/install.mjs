@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 // skill 本体 = 仓根以下条目（README* 另行通配）；排除项对任意深度生效
 // （含 packages/lang-dart 下的 node_modules 与 test）。
 const COPY_ENTRIES = ['SKILL.md', 'bin', 'src', 'packages', 'package.json']
-const COPY_README = /^README[A-Za-z0-9._-]*\.md$/
+const COPY_README = /^README/
 const COPY_EXCLUDE = new Set(['node_modules', 'test', 'docs', '.git'])
 
 export const SKILL_ROOTS = [

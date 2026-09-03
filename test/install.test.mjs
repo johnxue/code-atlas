@@ -8,6 +8,7 @@
 // 运行：node test/install.test.mjs   （npm test 的最后一环）
 // ==============================================================================
 
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -43,7 +44,7 @@ function makeRoots(home, ids) {
     mkdirSync(r.root, { recursive: true })
   }
 }
-const destOf = (home, id) => detectRoots(home).find((x) => x.id === id).root + '/code-atlas'
+const destOf = (home, id) => path.join(detectRoots(home).find((x) => x.id === id).root, 'code-atlas')
 
 // npm 桩：记录调用，可按 cwd 注入失败
 function stubNpm({ failFor = () => false } = {}) {
@@ -160,7 +161,7 @@ function main() {
   }
 
   // ----------------------------------------------------------------
-  section('no_robs_exist_defaults_to_agents_skills')
+  section('no_roots_exist_defaults_to_agents_skills')
   {
     const home = fakeHome()
     const npm = stubNpm()
@@ -211,6 +212,20 @@ function main() {
     const dests1 = r1.summary.map((s) => s.dest).sort().join('|')
     const dests2 = r2.summary.map((s) => s.dest).sort().join('|')
     assert('两次安装目标集合一致', dests1 === dests2)
+    rmSync(home, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
+  section('cli_rejects_install_extra_args')
+  {
+    const home = fakeHome()
+    const r = spawnSync(process.execPath,
+      [path.join(REPO_ROOT, 'bin', 'code-atlas.mjs'), 'install', '--help'],
+      { encoding: 'utf8', env: { ...process.env, HOME: home } })
+    assert('install 带多余参数退出非零', r.status === 1)
+    assert('报错信息指明 install 不接受额外参数', (r.stderr || '').includes('install 子命令不接受额外参数'))
+    assert('报错路径未发生任何安装', !existsSync(path.join(home, '.claude'))
+      && !existsSync(path.join(home, '.agents')))
     rmSync(home, { recursive: true, force: true })
   }
 

@@ -8,6 +8,7 @@ import {
   assembleSymbols, assembleApi, sortUnique, excludeRows, SECTION_HEADERS,
 } from './assemble.mjs'
 import { buildFreshnessHeader, ensureOutputDir } from './freshness.mjs'
+import { VERSION } from './version.mjs'
 
 function grepHeaderLine(mapFile, prefix) {
   const lines = readFileSync(mapFile, 'utf8').split('\n')
@@ -82,7 +83,7 @@ export async function mergeMain(opts, cfg) {
   // 合并输出的 freshness 元数据：Merged from / Combined by / 逐模块三行
   const extraLines = [
     `Merged from: ${inputs.join(' ')}`,
-    `Combined by: code-atlas.mjs v2.0.0 (merge)`,
+    `Combined by: code-atlas.mjs v${VERSION} (merge)`,
     ...mergedExtra,
   ]
   const headerLines = buildFreshnessHeader({

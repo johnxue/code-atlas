@@ -163,6 +163,10 @@ export function resolveScanConfig(opts) {
 
 export async function main(argv, argv0 = fileURLToPath(import.meta.url)) {
   if (argv[0] === 'install') {
+    if (argv.length > 1) {
+      console.error(`❌ Error: install 子命令不接受额外参数: ${argv.slice(1).join(' ')}（用法: ${path.basename(String(argv0))} install）`)
+      process.exit(1)
+    }
     const { installSkill } = await import('../src/install.mjs')
     process.exitCode = installSkill().code
     return
