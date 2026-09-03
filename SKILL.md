@@ -1,55 +1,61 @@
 ---
-name: code-atlas
-description: AST 代码地图（atlas）生成与检索。当需要在陌生/大型代码库中定位某个功能的实现、查符号定义所在文件与行区间、分析改动的反向引用影响面、检索 API 路由与调用点、或评估地图是否过期需要重扫时使用。支持 TS/JS/TSX、Python、Go、Dart/Flutter、Kotlin/Java/Android、Swift、C/C++。
+name: repo-map
+description: Code Atlas — generate and grep an AST repo map. Use when locating where a feature is implemented, finding a symbol's file and line range, analyzing the blast radius of a change via reverse references, finding API route definitions and call sites, or checking map freshness / rescanning. 在代码库中找功能实现、查符号定义、看改动影响面、找 API 端点时用。機能の実装場所を探す、シンボル定義、変更の影響範囲、API エンドポイント検索に使う。Supports TS/JS/TSX, Python, Go, Dart/Flutter, Kotlin/Java/Android, Swift, C/C++.
 ---
 
-# code-atlas
+# Code Atlas (repo-map)
 
-生成并检索一个仓库的 AST 代码地图：一份带 freshness 头的 Markdown 索引，用 grep 定位代码，
-代替逐文件阅读。检索技巧见本目录 README.md（工具手册）；本文件只含执行步骤与地图语义。
+Generate and query a repo's AST map: a Markdown index with a freshness header, searched with grep
+instead of reading files wholesale. Retrieval techniques live in this directory's README.md
+(the tool manual); this file carries only the procedure and the map's semantics.
 
-## 安装（首次）
+## Install (first run)
 
-把本仓 clone 到 skills 目录并装依赖：
+Clone into the skills directory and install dependencies:
 ```
-git clone <仓库地址> ~/.agents/skills/code-atlas && cd ~/.agents/skills/code-atlas && npm install
+git clone <repo-url> ~/.agents/skills/repo-map && cd ~/.agents/skills/repo-map && npm install
 ```
-依赖收敛为 Node >= 18 一项；Dart 语法 prebuild 随包分发（macOS arm64/x64 免编译，
-Linux/Windows 由 CI 补齐前走 postinstall 现场编译，需 C 编译链）。
+Node >= 18 is the only requirement. Dart grammar prebuilds ship with the package
+(macOS arm64/x64 need no toolchain; Linux/Windows fall back to a postinstall source build
+until CI prebuilds land, requiring a C toolchain).
 
-## 步骤
+## Procedure
 
-1. **定位 skill 目录**：本 SKILL.md 所在目录即扫描器根（含 `bin/scan_repo_map.mjs`）。
-2. **确保依赖已装**：skill 目录下无 `node_modules/` 时，在其中运行 `npm install`
-   （Dart 语法 prebuild 已随包分发，macOS arm64/x64 免编译；其他平台首次安装需 C 编译链）。
-3. **生成地图**（在目标仓或其子目录上）：
+1. **Locate the skill directory**: the directory holding this SKILL.md is the scanner root
+   (contains `bin/scan_repo_map.mjs`).
+2. **Ensure dependencies**: if the skill directory has no `node_modules/`, run `npm install` in it.
+3. **Generate the map** (on the target repo or a subdirectory):
    ```
-   node <SKILL_DIR>/bin/scan_repo_map.mjs -d <目标目录> -n <模块名> -o <输出.md>
+   node <SKILL_DIR>/bin/scan_repo_map.mjs -d <target-dir> -n <module-name> -o <output.md>
    ```
-   完成标准：输出打印 `✅ Generated`，地图头部 `# Source Commit`/`# Worktree` 非空。
-   - 只扫一种语言用 `--languages dart`（值域见 `--help`）；多份地图合并用 `--merge`。
-   - **已有地图先查 freshness**：`# Source Commit` 与目标仓 HEAD 一致且 `# Worktree: clean`
-     才可复用，否则重扫。
-4. **检索地图**（全部是对地图文件 grep，勿读源码全文）：
-   - 找定义：`grep ' <名字>$' 地图.md`（符号区行 `[Lstart-Lend]` 给出行区间，再精确 Read）
-   - 找影响面：`grep '^🔗 <模块路径>' 地图.md`（反向引用：谁 import 了它）
-   - 找文件依赖：`grep '^📁 <文件> .*imports(' 地图.md`（🌐 区）
-   - 找 API 端点：`grep '/api/<路径>' 地图.md`（📡 区，api-route 定义 / api-call 调用点，启发式）
-   - 查库的使用方：`grep '<包名>' 地图.md` 的 🔗/🌐 区行
+   Done when: stdout prints `✅ Generated` and the map header's `# Source Commit` / `# Worktree`
+   lines are present.
+   - One language only: `--languages dart` (value domain in `--help`); combine maps with `--merge`.
+   - **Check freshness before reusing an existing map**: reusable only when `# Source Commit`
+     equals the target repo's HEAD and `# Worktree: clean`; otherwise rescan.
+4. **Query the map** (grep the map file; never read source files wholesale):
+   - Find a definition: `grep ' <Name>$' map.md` (symbol rows carry `[Lstart-Lend]`, then Read precisely)
+   - Blast radius: `grep '^🔗 <module-path>' map.md` (reverse references: who imports it)
+   - File dependencies: `grep '^📁 <file> .*imports(' map.md` (🌐 section)
+   - API endpoints: `grep '/api/<path>' map.md` (📡 section; api-route definitions / api-call sites, heuristic)
+   - Library consumers: grep the package name across 🔗/🌐 rows
 
-完成标准：每次回答定位类问题时，结论必须落到 `文件:行号`，且该行号取自地图或地图指引下的 Read。
+Done when: every locate-style answer lands on `file:line`, with the line taken from the map or
+from a Read the map pointed to.
 
-## 地图语义（检索时参照）
+## Map semantics (consult while querying)
 
-- 符号区：`📁 <仓库相对路径> [L起-L止] <标签> <名字>`；标签表优先级与含义见 README.md。
-- 🌐 导入图谱：文件 → 依赖模块（相对导入已归一化为仓库相对路径）。
-- 🚪 文件符号清单：文件内符号名全集（超 25 个截断）。
-- 🔗 反向引用：模块 ← 引用它的文件（名单超 10 个截断；可证实的外部依赖折叠为 `(N importers, external)`）。
-- 📡 API 路径：启发式，Dart 为行级匹配，跨多行的调用不覆盖。
-- ⚠️ 诊断区：扫描中出现的问题；**有内容时检索结论须带着它一起判断**。
+- Symbol section: `📁 <repo-relative-path> [Lstart-Lend] <label> <name>`; label glossary in README.md.
+- 🌐 Import graph: file → dependency modules (relative imports normalized to repo-relative paths).
+- 🚪 File symbol index: all symbol names per file (truncated past 25).
+- 🔗 Reverse references: module ← files importing it (list truncated past 10; provably external
+  dependencies collapse to `(N importers, external)`).
+- 📡 API paths: heuristic; Dart matching is line-level and misses calls spanning multiple lines.
+- ⚠️ Diagnostics: scan-time problems; **when non-empty, weigh it together with any query conclusion**.
 
-## 已知边界
+## Known boundaries
 
-- Vue SFC / Objective-C 无语法不索引；TS 路径别名（`@/`）不解析，按原字符串聚合。
-- 无法证实为外部的引用（Python 裸名、Java/Kotlin 包路径）在 🔗 区保留原名单。
-- 地图是索引不是真相：行区间定位后必须 Read 代码确认。
+- Vue SFC / Objective-C have no grammar and are not indexed; TS path aliases (`@/`) are not resolved.
+- References not provably external (Python bare names, Java/Kotlin package paths) keep their full
+  importer lists in 🔗.
+- The map is an index, not ground truth: after locating a line range, Read the code to confirm.
