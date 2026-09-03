@@ -1,5 +1,7 @@
 node_modules/
 parser.so
+# 发行用 prebuilds 入库（CI/手工产出的 5 平台 .so），根构建产物仍忽略
+!packages/lang-dart/prebuilds/**/parser.so
 *.log
 .DS_Store
 package-lock.json.tmp
