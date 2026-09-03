@@ -37,6 +37,8 @@
 3. 已存在目标时：覆盖前打印将要替换的路径，版本相同则跳过（比 package.json version）。
 4. 全程打印每个动作与结果；最后汇总：安装到哪些目录、各自版本、跳过/失败原因。
 5. 纯 Node API 实现（fs.cpSync 等），不许 shell 调用（Windows 兼容）；`~` 用 os.homedir()。
+   豁免：`npm install` 需派生 npm 子进程（Windows 上 npm.cmd 需 shell:true——Node ≥18.20
+   对 .cmd 直接 spawn 抛 EINVAL），属文件操作之外的有意例外，与 src/install.mjs 文件头注释对齐。
 6. 幂等：重复运行结果一致。
 
 ## 4. 语言列表补 JSX
