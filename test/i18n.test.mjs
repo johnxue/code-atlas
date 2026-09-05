@@ -114,7 +114,10 @@ function main() {
     MESSAGES.en['i18n.test.only_en'] = 'EN FALLBACK {x}'
     try {
       assert('zh 表缺键、英文表有键 → 回退英文并插值', t('i18n.test.only_en', { x: 7 }) === 'EN FALLBACK 7')
-      assert('en 为当前语言时直接命中本表', t('i18n.test.only_en', { x: 8 }) === 'EN FALLBACK 8')
+      process.env.CODE_ATLAS_LANG = 'en'
+      assert('en 为当前语言时直接命中 en 表（非回退分支）', t('i18n.test.only_en', { x: 8 }) === 'EN FALLBACK 8')
+      assert('en 环境下普通键直接命中 en 表',
+        t('install.title', { version: '9.9.9' }) === '🔎 Code Atlas skill installer (local skill v9.9.9)')
       assert('两表都缺键 → 原样返回键名', t('i18n.test.nowhere') === 'i18n.test.nowhere')
     } finally {
       delete MESSAGES.en['i18n.test.only_en']
