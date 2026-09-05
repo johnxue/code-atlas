@@ -10,7 +10,8 @@
 
 import process from 'node:process'
 
-const MESSAGES = {
+// 导出供测试构造「当前语言表缺键、英文表有键」的回退分支（勿在运行时写入）
+export const MESSAGES = {
   en: {
     'help.usage': `Usage: {self} [OPTIONS]
        {self} install`,

@@ -13,7 +13,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectLang } from '../src/i18n.mjs'
+import { detectLang, MESSAGES, t } from '../src/i18n.mjs'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(REPO_ROOT, 'bin', 'code-atlas.mjs')
@@ -62,6 +62,12 @@ function main() {
       detectLang({ CODE_ATLAS_LANG: 'fr_FR.UTF-8', LANG: 'ja_JP.UTF-8' }) === 'en')
     assert('空字符串视为未设置，落到链上下一变量',
       detectLang({ CODE_ATLAS_LANG: '', LANG: 'ja_JP.UTF-8' }) === 'ja')
+    // P2-1/P2-2：语言标签边界匹配（子标签分隔符 - / _）
+    assert('zh_HK → zh', detectLang({ CODE_ATLAS_LANG: 'zh_HK' }) === 'zh')
+    assert('zh_TW → zh', detectLang({ CODE_ATLAS_LANG: 'zh_TW' }) === 'zh')
+    assert('ja-JP → ja', detectLang({ CODE_ATLAS_LANG: 'ja-JP' }) === 'ja')
+    assert('zhfoo 非法标签不命中 → en', detectLang({ CODE_ATLAS_LANG: 'zhfoo' }) === 'en')
+    assert('jafoo 非法标签不命中 → en', detectLang({ CODE_ATLAS_LANG: 'jafoo' }) === 'en')
   }
 
   // ----------------------------------------------------------------
@@ -92,6 +98,30 @@ function main() {
 
     const def = runHelp({ LANG: 'en_US.UTF-8' })
     assert('未设 CODE_ATLAS_LANG 时按 LANG 解析（en_US → Usage:）', def.stdout.includes('Usage:'))
+
+    const zhfoo = runHelp({ CODE_ATLAS_LANG: 'zhfoo', LANG: 'zh_CN.UTF-8' })
+    assert('CLI 层 zhfoo 回退英文（Usage:，LANG 里的 zh 不再兜底）', zhfoo.stdout.includes('Usage:'))
+    assert('CLI 层 zhfoo 不含中文选项区', !zhfoo.stdout.includes('选项:'))
+  }
+
+  // ----------------------------------------------------------------
+  console.log('\n\x1b[1m== t_missing_key_fallback ==\x1b[0m')
+  {
+    // P2-2：当前语言表缺键、英文表有键 → 回退英文（含占位符插值）；两表都缺 → 原样返回键名。
+    // 用 MESSAGES 注入临时键构造分支，测毕清理；t() 走真实 process.env，临时切换后恢复。
+    const saved = process.env.CODE_ATLAS_LANG
+    process.env.CODE_ATLAS_LANG = 'zh'
+    MESSAGES.en['i18n.test.only_en'] = 'EN FALLBACK {x}'
+    try {
+      assert('zh 表缺键、英文表有键 → 回退英文并插值', t('i18n.test.only_en', { x: 7 }) === 'EN FALLBACK 7')
+      assert('en 为当前语言时直接命中本表', t('i18n.test.only_en', { x: 8 }) === 'EN FALLBACK 8')
+      assert('两表都缺键 → 原样返回键名', t('i18n.test.nowhere') === 'i18n.test.nowhere')
+    } finally {
+      delete MESSAGES.en['i18n.test.only_en']
+      if (saved === undefined) delete process.env.CODE_ATLAS_LANG
+      else process.env.CODE_ATLAS_LANG = saved
+    }
+    assert('临时键已清理，不污染消息表', !('i18n.test.only_en' in MESSAGES.en))
   }
 
   // ----------------------------------------------------------------
