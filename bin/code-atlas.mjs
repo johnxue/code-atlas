@@ -26,19 +26,6 @@ function showHelp(argv0) {
 High-performance Multi-Stack AST Repo Map Generator using ast-grep.
 Supports: React/TS/TSX/JSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (Swift/C/C++).
 
-已知限制:
-  - Vue (.vue SFC) 与 Objective-C (.m/.mm) 无 tree-sitter 语法，ast-grep 无法解析，不索引
-    （检测到 .vue 文件时会输出警告；Vue 相关 pattern 仅覆盖 .ts/.js 中直接调用其 API 的场景）
-  - 自动跳过 DEFAULT_EXCLUDES 列出的目录（node_modules/、.git/、build/、.dart_tool/、Pods/）
-  - 地图包含四个跨层索引区：🌐 导入图谱（文件→依赖）、🚪 文件符号清单（文件内符号全集）、
-    🔗 反向引用（模块←引用它的文件）、📡 API 路径（api-route 路由定义 / api-call 调用点，启发式）
-  - Dart 的 api-call 为行级启发式（调用形态 + URL 字面量三重过滤），跨多行的调用不覆盖
-  - 导入归一化：相对路径（./ ../）、Python 点式导入、Dart package:self（按 pubspec name 判别）
-    会解析为仓库相对路径后再聚合；找不到目标文件的相对导入按文本归一化结果聚合；
-    TS 路径别名（@/、~/ 等）不解析，按原字符串聚合
-  - 🔗 区对可证实的外部依赖（dart:* / package:非self / node_modules 可证实的 JS 裸包名）
-    折叠 importer 名单为 "(N importers, external)"；具体引用文件可在 🌐 区 grep 模块名获得
-
 Subcommands:
   install               Install this skill into every detected agent skills directory
                         (~/.claude/skills, ~/.agents/skills, ~/.codex/skills,
