@@ -49,12 +49,16 @@ jobs:
 
       - name: Build parser (Unix)
         if: runner.os != 'Windows'
-        run: npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
+        run: |
+          mkdir -p prebuilds/prebuild-${{ matrix.platform }}
+          npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
 
       - name: Build parser (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
+        run: |
+          mkdir -p prebuilds/prebuild-${{ matrix.platform }}
+          npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
 
       - uses: actions/upload-artifact@v4
         with:
