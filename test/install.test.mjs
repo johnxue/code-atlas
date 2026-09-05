@@ -309,6 +309,43 @@ function main() {
   }
 
   // ----------------------------------------------------------------
+  section('fallback_created_root_rollback')
+  {
+    // P1：兜底创建接入 rootCreated 状态机——兜底 + npm 失败时空兜底根一并回滚，
+    // 下一轮一级探测不会把残留空根误当已存在根选中
+    const home = fakeHome()
+    const r1 = installSkill({ homedir: home, log: NOLOG, runNpmInstall: stubNpm({ failFor: () => true }).run, pathEnv: '' })
+    assert('兜底 + npm 失败 → failed 且整体退出码 1',
+      r1.code === 1 && r1.summary[0].status === 'failed')
+    assert('空兜底根已回滚（~/.agents/skills 不残留）', !existsSync(path.join(home, '.agents', 'skills')))
+    const lines2 = []
+    const r2 = installSkill({ homedir: home, log: (m) => lines2.push(m), runNpmInstall: stubNpm().run, pathEnv: '' })
+    assert('下一轮不因残留根误选：仍走兜底并安装成功',
+      r2.code === 0 && r2.summary[0].status === 'installed'
+      && lines2.some((l) => l.includes('None of the four skills directories exists')))
+    rmSync(home, { recursive: true, force: true })
+
+    // 兜底根创建成功但失败时已非空（混入其他内容）→ 保留并说明，不误删
+    const home2 = fakeHome()
+    const badDest = destOf(home2, 'agents')
+    const linesB = []
+    const npmB = stubNpm({
+      failFor: (cwd) => {
+        if (cwd !== badDest) return false
+        writeFileSync(path.join(cwd, '..', 'user-file.txt'), 'mine\n') // 模拟兜底根内混入其他内容
+        return true
+      },
+    })
+    const rB = installSkill({ homedir: home2, log: (m) => linesB.push(m), runNpmInstall: npmB.run, pathEnv: '' })
+    assert('非空兜底根场景 → failed 且整体退出码 1',
+      rB.code === 1 && rB.summary[0].status === 'failed')
+    assert('非空兜底根保留（用户内容未被误删）',
+      existsSync(path.join(home2, '.agents', 'skills', 'user-file.txt')))
+    assert('日志说明兜底根保留', linesB.some((l) => l.includes('not empty, kept')))
+    rmSync(home2, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
   section('copy_content_and_exclusions')
   {
     const home = fakeHome()

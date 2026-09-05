@@ -207,7 +207,10 @@ export function installSkill(options = {}) {
     // 兜底创建同样纳入逐目标错误语义：根被占位/创建失败 → 计 failed（退出码 1），不再整体中止
     try {
       mkdirSync(fallback.root, { recursive: true })
-      fallback.exists = true // 兜底目录本次已创建，避免下方循环把它当「待创建」再打 ✚ 行
+      // 兜底根由本轮创建 → 携带 rootCreated 进入下方循环：失败时空根一并回滚，
+      // 与二级创建同一条状态机语义；否则残留空根会被下一轮一级探测误选中
+      fallback.rootCreated = true
+      fallback.exists = true // 兜底目录本次已就位，避免下方循环把它当「待创建」再打 ✚ 行
       log(tr('install.fallback', { root: fallback.relative }))
       targets = [fallback]
     } catch (e) {
@@ -224,7 +227,8 @@ export function installSkill(options = {}) {
 
   for (const tgt of targets) {
     const dest = path.join(tgt.root, 'code-atlas')
-    let rootCreated = false
+    // 兜底根已在兜底分支创建（rootCreated 随对象带入）；二级目标在下方创建分支置位
+    let rootCreated = tgt.rootCreated === true
     if (!tgt.exists) {
       // 三级探测第 2 级：目录缺失但本体存在 → 创建 skills 目录再安装。
       // 先分类再动作（与 f51da49 占位保护语义一致）：根被非目录占用/创建失败
