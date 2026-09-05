@@ -202,6 +202,28 @@ function main() {
   }
 
   // ----------------------------------------------------------------
+  section('path_probe_rejects_directories')
+  {
+    // P1-1：PATH 上名为 claude 的 755 目录不是本体（X_OK 对目录也通过，isFile 先决拒绝），
+    // 不得据此返回 claude 证据、更不得创建 ~/.claude/skills
+    const home = fakeHome()
+    const binDir = path.join(home, 'fakebin')
+    mkdirSync(path.join(binDir, 'claude'), { recursive: true })
+    chmodSync(path.join(binDir, 'claude'), 0o755)
+    const detected = detectRoots(home, { pathEnv: binDir })
+    assert('PATH 上 755 目录 claude → 不作本体证据（agent 为空）',
+      detected.find((r) => r.id === 'claude').agent === '')
+    assert('真可执行文件仍是有效证据（对照）',
+      detectRoots(fakeHome(), { pathEnv: fakeBinDir(fakeHome(), ['claude']) })
+        .find((r) => r.id === 'claude').agent === 'claude')
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: binDir })
+    assert('仅目录证据 → 不创建 ~/.claude，走兜底装 ~/.agents（退出码 0）',
+      code === 0 && !existsSync(path.join(home, '.claude'))
+      && summary.length === 1 && summary[0].root === path.dirname(destOf(home, 'agents')))
+    rmSync(home, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
   section('copy_content_and_exclusions')
   {
     const home = fakeHome()

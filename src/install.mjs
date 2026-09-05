@@ -53,7 +53,8 @@ const AGENT_PROBES = {
   opencode: { homeDir: '.config/opencode', bins: ['opencode'] },
 }
 
-// PATH 查找：按平台分隔符切目录；POSIX 要求 X_OK 权限位（同名非执行文件不算证据）；
+// PATH 查找：按平台分隔符切目录；候选必须是常规文件（755 目录的 X_OK 也通过，先决
+// isFile 排除目录；statSync 跟随软链——软链到可执行文件仍是合法本体）再验 X_OK 权限位；
 // Windows 额外匹配可执行扩展名。返回命中路径，未命中返回空串。
 function findOnPath(name, pathEnv) {
   if (!pathEnv) return ''
@@ -63,6 +64,7 @@ function findOnPath(name, pathEnv) {
     for (const ext of exts) {
       const candidate = path.join(dir, name + ext)
       try {
+        if (!statSync(candidate).isFile()) continue
         accessSync(candidate, fsConstants.X_OK)
         return candidate
       } catch { /* 不是这个，继续找 */ }
