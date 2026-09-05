@@ -40,6 +40,13 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # npm ci --ignore-scripts skips tree-sitter-cli's install script, which is
+      # what downloads the platform binary — fetch it explicitly (its install.js
+      # writes the binary into its own package directory, so run it from there).
+      - name: Fetch tree-sitter CLI binary
+        working-directory: packages/lang-dart/node_modules/tree-sitter-cli
+        run: node install.js
+
       - name: Build parser (Unix)
         if: runner.os != 'Windows'
         run: npx tree-sitter build -o prebuilds/prebuild-${{ matrix.platform }}/parser.so
