@@ -279,10 +279,12 @@ Supports: React/TS/TSX/JSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), i
 }
 
 // 链上第一个非空值定胜负；无效值不回退到链上后续变量，直接落英文（可预期性优先）
+// 语言标签边界匹配：值 === 'zh' 或以 'zh-'/'zh_' 开头（ja 同理）；
+// zhfoo、C、POSIX 等非 locale 串不命中，回退英文。
 export function detectLang(env = process.env) {
   const raw = String(env.CODE_ATLAS_LANG || env.LC_ALL || env.LC_CTYPE || env.LANG || '').toLowerCase()
-  if (raw.startsWith('zh')) return 'zh'
-  if (raw.startsWith('ja')) return 'ja'
+  if (raw === 'zh' || raw.startsWith('zh-') || raw.startsWith('zh_')) return 'zh'
+  if (raw === 'ja' || raw.startsWith('ja-') || raw.startsWith('ja_')) return 'ja'
   return 'en'
 }
 
