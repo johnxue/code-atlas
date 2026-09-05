@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-13,         platform: macOS-X64 }
+          - { os: macos-15-intel,   platform: macOS-X64 }
           - { os: macos-14,         platform: macOS-ARM64 }
           - { os: ubuntu-latest,    platform: Linux-X64 }
           - { os: ubuntu-24.04-arm, platform: Linux-ARM64 }
