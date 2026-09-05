@@ -8,6 +8,7 @@ import {
   assembleSymbols, assembleApi, sortUnique, excludeRows, SECTION_HEADERS,
 } from './assemble.mjs'
 import { buildFreshnessHeader, ensureOutputDir } from './freshness.mjs'
+import { t } from './i18n.mjs'
 import { VERSION } from './version.mjs'
 
 function grepHeaderLine(mapFile, prefix) {
@@ -41,14 +42,14 @@ export async function mergeMain(opts, cfg) {
   const inputs = opts.mergeInputs
 
   if (inputs.length === 0) {
-    console.error('❌ --merge 需要至少一个输入地图')
+    console.error(t('merge.needsInput'))
     process.exit(1)
   }
   for (const f of inputs) {
     let ok = false
     try { ok = existsSync(f) && statSync(f).isFile() } catch { ok = false }
     if (!ok) {
-      console.error(`❌ 输入地图不存在: ${f}`)
+      console.error(t('merge.inputMissing', { file: f }))
       process.exit(1)
     }
   }
@@ -75,7 +76,7 @@ export async function mergeMain(opts, cfg) {
     const r = grepHeaderLine(f, '# Source Path:')
     if (firstRoot === null) firstRoot = r
     else if (r !== firstRoot) {
-      console.error(`⚠️ 输入地图 Source Path 不一致（${firstRoot} vs ${r}）：不同相对根下的行键可能冲突，建议在同一仓库根扫描`)
+      console.error(t('merge.rootMismatch', { first: firstRoot, other: r }))
     }
     splitSections(f, buckets)
   }
@@ -122,5 +123,5 @@ export async function mergeMain(opts, cfg) {
   }
 
   writeFileSync(outputFile, out.join('\n') + '\n')
-  console.log(`✅ Merged [${moduleName}] -> ${outputFile} (${total} symbols)`)
+  console.log(t('merge.done', { name: moduleName, file: outputFile, total }))
 }

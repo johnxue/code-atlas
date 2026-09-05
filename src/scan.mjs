@@ -12,6 +12,7 @@ import {
   excludeRows, SECTION_HEADERS,
 } from './assemble.mjs'
 import { buildFreshnessHeader, ensureOutputDir } from './freshness.mjs'
+import { t } from './i18n.mjs'
 
 export async function scanMain(opts) {
   const { targetDirAbs, moduleName, outputFile, langList, crosslayer, excludes, maxLines } = opts
@@ -24,7 +25,7 @@ export async function scanMain(opts) {
   const headerLines = buildFreshnessHeader({ name: moduleName, sourcePath: targetDirAbs, langList })
   const headerLineCount = headerLines.length
 
-  console.log(`🔍 Scanning [${moduleName}] in ${targetDirAbs}...`)
+  console.log(t('scan.start', { name: moduleName, dir: targetDirAbs }))
 
   const ctx = {
     targetDirAbs,
@@ -97,10 +98,10 @@ export async function scanMain(opts) {
 
   writeFileSync(outputFile, out.join('\n') + '\n')
 
-  console.log(`✅ Generated [${moduleName}] map -> ${outputFile} (${total} symbols)`)
+  console.log(t('scan.done', { name: moduleName, file: outputFile, total }))
 
   if (engine.warnings.length > 0) {
-    console.error(`⚠️ 发现 ${engine.warnings.length} 条警告（详见地图页脚）：`)
+    console.error(t('scan.warningsFooter', { count: engine.warnings.length }))
     for (const w of engine.warnings) console.error(w)
   }
 }

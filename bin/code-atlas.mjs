@@ -11,6 +11,7 @@ import { statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { t } from '../src/i18n.mjs'
 import { VERSION } from '../src/version.mjs'
 
 const SUPPORTED_LANGUAGES = [
@@ -20,39 +21,13 @@ const SUPPORTED_LANGUAGES = [
 
 function showHelp(argv0) {
   const self = path.basename(String(argv0))
-  console.log(`Usage: ${self} [OPTIONS]
-       ${self} install
-
-High-performance Multi-Stack AST Repo Map Generator using ast-grep.
-Supports: React/TS/TSX/JSX, Python, Go, Flutter (Dart), Android (Kotlin/Java), iOS (Swift/C/C++).
-
-Subcommands:
-  install               Install this skill into every detected agent skills directory
-                        (~/.claude/skills, ~/.agents/skills, ~/.codex/skills,
-                        ~/.config/opencode/skills; if none exists, creates ~/.agents/skills).
-                        Idempotent: an existing same-version target is skipped.
-
-Options:
-  -d, --dir <path>       Target source directory to scan (default: current directory '.')
-  -o, --output <file>    Output markdown file path (default: <target_dir>/.repo_map_<name>.md)
-  -n, --name <tag>       Module name tag (default: target folder name)
-  -x, --no-crosslayer   Skip all cross-layer sections (smaller map; symbol map only)
-  -e, --exclude <sub>    Exclude rows whose relative path contains <sub> (repeatable; no '|' in value)
-  -m, --max-lines <N>    Trim symbol section to N rows (safety belt for huge repos)
-  --languages <csv>      Scan only these languages (comma-separated, no spaces):
-                         typescript,javascript,tsx,python,go,dart,kotlin,java,swift,c,cpp
-                         (default: all supported languages)
-  --merge <map...>       Merge previously generated maps (assume same Source Path root; -o/-n apply)
-  -v, --version          Show script version
-  -h, --help             Show this help message
-
-Examples:
-  ${self} install
-  ./bin/code-atlas.mjs -d ./admin-web -n frontend
-  ./bin/code-atlas.mjs -d ./backend -n backend -o ./docs/backend_map.md
-  ./bin/code-atlas.mjs -d ./flutter_app -n flutter
-  ./bin/code-atlas.mjs --merge ./backend_map.md ./flutter_map.md -n all -o ./all_map.md
-  ./bin/code-atlas.mjs -d ./lib -n flutter --languages dart -o docs/ast-maps/flutter-ast-map.md`)
+  console.log([
+    t('help.usage', { self }),
+    t('help.description'),
+    t('help.subcommands'),
+    t('help.options'),
+    t('help.examples', { self }),
+  ].join('\n\n'))
 }
 
 export function parseArgs(argv, argv0) {
@@ -72,7 +47,7 @@ export function parseArgs(argv, argv0) {
   const needValue = (flag) => {
     i += 1
     if (i >= argv.length) {
-      console.error(`❌ Error: ${flag} 需要一个参数值`)
+      console.error(t('err.flagNeedsValue', { flag }))
       process.exit(1)
     }
     return argv[i]
@@ -100,7 +75,7 @@ export function parseArgs(argv, argv0) {
         if (opts.mergeMode) {
           opts.mergeInputs.push(a)
         } else {
-          console.error(`❌ Unknown option: ${a}`)
+          console.error(t('err.unknownOption', { option: a }))
           showHelp(argv0)
           process.exit(1)
         }
@@ -117,7 +92,7 @@ export function resolveScanConfig(opts) {
     isDir = statSync(opts.targetDir).isDirectory()
   } catch { /* 不存在 */ }
   if (!isDir) {
-    console.error(`❌ Error: Target directory does not exist: ${opts.targetDir}`)
+    console.error(t('err.targetDirMissing', { dir: opts.targetDir }))
     process.exit(1)
   }
   // 逻辑绝对路径（与 Bash `cd && pwd` 的逻辑 PWD 语义一致，不解析符号链接）
@@ -128,17 +103,17 @@ export function resolveScanConfig(opts) {
   let langList
   if (opts.languagesSet) {
     if (opts.languages === '') {
-      console.error('❌ Error: --languages 为空值')
+      console.error(t('err.languagesEmpty'))
       process.exit(1)
     }
     if (opts.languages.startsWith(',') || opts.languages.endsWith(',') || opts.languages.includes(',,')) {
-      console.error(`❌ Error: --languages 含空字段: '${opts.languages}'（请用逗号分隔且不留空位）`)
+      console.error(t('err.languagesEmptyField', { value: opts.languages }))
       process.exit(1)
     }
     langList = opts.languages.split(',')
     for (const l of langList) {
       if (!SUPPORTED_LANGUAGES.includes(l)) {
-        console.error(`❌ Error: 未知或不支持的语言: '${l}'（支持: ${SUPPORTED_LANGUAGES.join(',') }）`)
+        console.error(t('err.unsupportedLanguage', { lang: l, langs: SUPPORTED_LANGUAGES.join(',') }))
         process.exit(1)
       }
     }
@@ -151,7 +126,8 @@ export function resolveScanConfig(opts) {
 export async function main(argv, argv0 = fileURLToPath(import.meta.url)) {
   if (argv[0] === 'install') {
     if (argv.length > 1) {
-      console.error(`❌ Error: install 子命令不接受额外参数: ${argv.slice(1).join(' ')}（用法: ${path.basename(String(argv0))} install）`)
+      const usage = `${path.basename(String(argv0))} install`
+      console.error(t('err.installExtraArgs', { args: argv.slice(1).join(' '), usage }))
       process.exit(1)
     }
     const { installSkill } = await import('../src/install.mjs')

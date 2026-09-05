@@ -15,6 +15,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { detectRoots, installSkill } from '../src/install.mjs'
 
+// 断言 install 输出/摘要 reason 文案的用例统一钉在英文基线（en），任意 locale 机器结果一致
+process.env.CODE_ATLAS_LANG = 'en'
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 let PASS = 0
@@ -267,7 +270,8 @@ function main() {
       [path.join(REPO_ROOT, 'bin', 'code-atlas.mjs'), 'install', '--help'],
       { encoding: 'utf8', env: { ...process.env, HOME: home } })
     assert('install 带多余参数退出非零', r.status === 1)
-    assert('报错信息指明 install 不接受额外参数', (r.stderr || '').includes('install 子命令不接受额外参数'))
+    assert('报错信息指明 install 不接受额外参数',
+      (r.stderr || '').includes('install subcommand does not accept extra arguments'))
     assert('报错路径未发生任何安装', !existsSync(path.join(home, '.claude'))
       && !existsSync(path.join(home, '.agents')))
     rmSync(home, { recursive: true, force: true })
@@ -286,7 +290,7 @@ function main() {
     const byDest = Object.fromEntries(summary.map((s) => [s.dest, s]))
     assert('文件占位 → 整体退出码 1', code === 1)
     assert('文件占位 → 状态 failed 且注明非目录占用',
-      byDest[fileDest].status === 'failed' && byDest[fileDest].reason.includes('非目录'))
+      byDest[fileDest].status === 'failed' && byDest[fileDest].reason.includes('non-directory'))
     assert('普通文件内容原样保留',
       readFileSync(fileDest, 'utf8') === 'precious user file\n')
     assert('其余目标照常安装（继续而非中止）',

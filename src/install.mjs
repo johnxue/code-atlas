@@ -15,6 +15,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rm
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { t as tr } from './i18n.mjs'
 
 // skill 本体 = 仓根以下条目（README* 另行通配）；排除项对任意深度生效
 // （含 packages/lang-dart 下的 node_modules 与 test）。
@@ -25,10 +26,10 @@ const COPY_EXCLUDE = new Set(['node_modules', 'test', 'docs', '.git'])
 const INCOMPLETE_MARKER = '.install-incomplete'
 
 export const SKILL_ROOTS = [
-  { id: 'claude', label: 'Claude Code', relative: '.claude/skills' },
-  { id: 'agents', label: 'Kimi Code / Codex / pi / Hermes（通用）', relative: '.agents/skills' },
-  { id: 'codex', label: 'Codex CLI', relative: '.codex/skills' },
-  { id: 'opencode', label: 'opencode', relative: '.config/opencode/skills' },
+  { id: 'claude', labelKey: 'install.agent.claude', relative: '.claude/skills' },
+  { id: 'agents', labelKey: 'install.agent.agents', relative: '.agents/skills' },
+  { id: 'codex', labelKey: 'install.agent.codex', relative: '.codex/skills' },
+  { id: 'opencode', labelKey: 'install.agent.opencode', relative: '.config/opencode/skills' },
 ]
 
 export function detectRoots(homedir = os.homedir()) {
@@ -103,10 +104,10 @@ const indent = (s) => s.split('\n').map((l) => `       ${l}`).join('\n')
 function failTarget(dest, destPreExisted, log) {
   if (!destPreExisted) {
     rmSync(dest, { recursive: true, force: true })
-    log(`   ↩️ 已回滚本次新建的目录（失败不留半成品）: ${dest}`)
+    log(tr('install.rolledBack', { dest }))
   } else {
     writeFileSync(path.join(dest, INCOMPLETE_MARKER), `incomplete install at ${new Date().toISOString()}\n`)
-    log(`   ⚠️ 已保留原目录并写入标记 ${INCOMPLETE_MARKER}——下次运行将重试而非跳过`)
+    log(tr('install.markedIncomplete', { marker: INCOMPLETE_MARKER }))
   }
 }
 
@@ -123,80 +124,80 @@ export function installSkill(options = {}) {
     runNpmInstall = defaultNpmRunner,
   } = options
   const version = readVersion(path.join(sourceRoot, 'package.json')) || 'unknown'
-  log(`🔎 Code Atlas skill 安装器（本机 skill v${version}）`)
+  log(tr('install.title', { version }))
 
   const roots = detectRoots(homedir)
-  log('探测 agent skills 根目录:')
+  log(tr('install.probing'))
   for (const r of roots) {
-    log(`   ${r.exists ? '✔ 存在' : '✘ 不存在'}  ~/${r.relative}  (${r.label})`)
+    const label = tr(r.labelKey)
+    log(`   ${r.exists ? tr('install.probe.exists') : tr('install.probe.missing')}  ~/${r.relative}  (${label})`)
   }
 
   let targets = roots.filter((r) => r.exists)
   if (targets.length === 0) {
     const fallback = roots.find((r) => r.id === 'agents')
     mkdirSync(fallback.root, { recursive: true })
-    log(`ℹ️ 四个 skills 目录均不存在，默认创建 ~/${fallback.relative} 并安装到那里`)
+    log(tr('install.fallback', { root: fallback.relative }))
     targets = [fallback]
   }
 
   const summary = []
-  for (const t of targets) {
-    const dest = path.join(t.root, 'code-atlas')
+  for (const tgt of targets) {
+    const dest = path.join(tgt.root, 'code-atlas')
     const cur = classifyDest(dest)
     if (cur.kind === 'other') {
-      log(`❌ 目标位置已被非目录占用，为防误删不做任何改动: ${dest}（类型: ${cur.type}）`)
-      summary.push({ root: t.root, dest, status: 'failed', reason: `目标位置被非目录占用（${cur.type}）` })
+      log(tr('install.destOccupied', { dest, type: cur.type }))
+      summary.push({ root: tgt.root, dest, status: 'failed', reason: tr('install.reason.occupied', { type: cur.type }) })
       continue
     }
     const destVersion = cur.kind === 'dir' ? readVersion(path.join(dest, 'package.json')) : ''
     const incomplete = cur.kind === 'dir' && existsSync(path.join(dest, INCOMPLETE_MARKER))
     if (destVersion && destVersion === version && !incomplete) {
-      log(`⏭️  跳过 ${dest}（版本相同 v${destVersion}）`)
-      summary.push({ root: t.root, dest, status: 'skipped', version: destVersion })
+      log(tr('install.skipSameVersion', { dest, version: destVersion }))
+      summary.push({ root: tgt.root, dest, status: 'skipped', version: destVersion })
       continue
     }
     const destPreExisted = cur.kind === 'dir'
-    if (incomplete) log(`♻️ 重试未完成的安装 ${dest}（目标 v${version}）`)
-    else if (destPreExisted) log(`🔄 将替换 ${dest}（现有 v${destVersion || '?'} → v${version}）`)
-    else log(`📦 安装到 ${dest}`)
+    if (incomplete) log(tr('install.retryIncomplete', { dest, version }))
+    else if (destPreExisted) log(tr('install.replace', { dest, old: destVersion || '?', new: version }))
+    else log(tr('install.copying', { dest }))
     try {
       copySkillFiles(sourceRoot, dest)
-      log('   ✔ 已复制 skill 本体（SKILL.md + bin/ + src/ + packages/ + package.json + README*，'
-        + '排除 node_modules/test/docs/.git）')
+      log(tr('install.copied'))
     } catch (e) {
-      log(`   ❌ 复制失败: ${e.message}`)
+      log(tr('install.copyFailed', { message: e.message }))
       failTarget(dest, destPreExisted, log)
-      summary.push({ root: t.root, dest, status: 'failed', reason: `复制失败: ${e.message}` })
+      summary.push({ root: tgt.root, dest, status: 'failed', reason: tr('install.reason.copyFailed', { message: e.message }) })
       continue
     }
-    log('   ⏳ npm install --omit=dev ...')
+    log(tr('install.npmRunning'))
     const npmResult = runNpmInstall(dest)
     if (!npmResult.ok) {
-      log(`   ❌ npm install 失败（该目标放弃，继续其余目标）:\n${indent(npmResult.error || '')}`)
+      log(tr('install.npmFailed', { detail: indent(npmResult.error || '') }))
       failTarget(dest, destPreExisted, log)
-      summary.push({ root: t.root, dest, status: 'failed', reason: 'npm install 失败' })
+      summary.push({ root: tgt.root, dest, status: 'failed', reason: tr('install.reason.npmFailed') })
       continue
     }
-    log('   ✔ npm install 完成')
-    summary.push({ root: t.root, dest, status: 'installed', version })
+    log(tr('install.npmDone'))
+    summary.push({ root: tgt.root, dest, status: 'installed', version })
   }
 
   const installed = summary.filter((s) => s.status === 'installed')
   const skipped = summary.filter((s) => s.status === 'skipped')
   const failed = summary.filter((s) => s.status === 'failed')
   log('')
-  log('📋 汇总:')
+  log(tr('install.summaryTitle'))
   for (const s of summary) {
-    const tail = s.status === 'failed' ? `（${s.reason}）`
-      : s.status === 'skipped' ? `（v${s.version} 已是最新，跳过）`
-      : `（v${s.version}）`
+    const tail = s.status === 'failed' ? tr('install.summary.failedTail', { reason: s.reason })
+      : s.status === 'skipped' ? tr('install.summary.skippedTail', { version: s.version })
+      : tr('install.summary.installedTail', { version: s.version })
     const mark = s.status === 'failed' ? '❌' : s.status === 'skipped' ? '⏭️ ' : '✅'
     log(`   ${mark} ${s.dest}${tail}`)
   }
   if (failed.length > 0) {
-    log(`❌ 完成：${installed.length} 个新装，${skipped.length} 个跳过，${failed.length} 个失败`)
+    log(tr('install.doneFailed', { installed: installed.length, skipped: skipped.length, failed: failed.length }))
     return { code: 1, summary }
   }
-  log(`✅ 完成：${installed.length} 个新装，${skipped.length} 个跳过，0 个失败`)
+  log(tr('install.doneOk', { installed: installed.length, skipped: skipped.length }))
   return { code: 0, summary }
 }

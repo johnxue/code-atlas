@@ -30,8 +30,10 @@ const fail = (t) => { console.log(`  \x1b[31m✘ ${t}\x1b[0m`); FAIL++ }
 const skip = (t) => { console.log(`  \x1b[33m- ${t}\x1b[0m`); SKIP++ }
 
 // 运行一次扫描（子进程，等价 Bash run_scan）
+// CODE_ATLAS_LANG=en：断言 CLI 文案的测试统一钉在英文基线，任意 locale 机器结果一致
 function runScan(args) {
-  return spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' })
+  return spawnSync(process.execPath, [CLI, ...args],
+    { encoding: 'utf8', env: { ...process.env, CODE_ATLAS_LANG: 'en' } })
 }
 
 // expect_ok <label> <args...>：扫描必须成功
@@ -262,7 +264,7 @@ async function main() {
   {
     const r = runScan(['-d', SRC, '-n', 'x', '--languages', 'dart,', '-o', w('languages_invalid/m.md')])
     if (r.status === 0) fail('尾随逗号本应报错（退出码为 0）')
-    else if ((r.stderr || '').includes('空字段')) ok('尾随逗号错误信息明确（含 空字段）')
+    else if ((r.stderr || '').includes('empty fields')) ok('尾随逗号错误信息明确（含 empty fields）')
     else fail('尾随逗号错误信息不明确')
   }
 

@@ -28,7 +28,7 @@
     "SKILL.md"
   ],
   "scripts": {
-    "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs && node test/gitignore_parity.test.mjs && node test/install.test.mjs",
+    "test": "node test/scan_repo_map.test.mjs && node test/rules_parity.test.mjs && node test/gitignore_parity.test.mjs && node test/install.test.mjs && node test/i18n.test.mjs",
     "golden": "bash test/golden.sh"
   },
   "engines": {
