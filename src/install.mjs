@@ -155,6 +155,20 @@ function failTarget(dest, destPreExisted, log) {
   }
 }
 
+// 本轮新建根的失败收尾：目标回滚后根应为空 → 一并删除（残留空根会让下一轮一级探测
+// 误选中）；若根内出现其他内容（非空，可能混入用户数据）则保留并说明，绝不误删。
+function rollbackCreatedRoot(root, created, log) {
+  if (!created) return
+  let empty = false
+  try { empty = readdirSync(root).length === 0 } catch { return } // 不可读就不动它
+  if (!empty) {
+    log(tr('install.rootKept', { root }))
+    return
+  }
+  rmSync(root, { recursive: true, force: true })
+  log(tr('install.rootRolledBack', { root }))
+}
+
 /**
  * 三级探测安装 skill 本体：
  *   1. skills 目录存在 → 照旧安装；
@@ -186,21 +200,55 @@ export function installSkill(options = {}) {
     log(`   ${state}  ~/${r.relative}  (${tr(r.labelKey)})`)
   }
 
+  const summary = []
   let targets = roots.filter((r) => r.exists || r.agent)
   if (targets.length === 0) {
     const fallback = roots.find((r) => r.id === 'agents')
-    mkdirSync(fallback.root, { recursive: true })
-    fallback.exists = true // 兜底目录本次已创建，避免下方循环把它当「待创建」再打 ✚ 行
-    log(tr('install.fallback', { root: fallback.relative }))
-    targets = [fallback]
+    // 兜底创建同样纳入逐目标错误语义：根被占位/创建失败 → 计 failed（退出码 1），不再整体中止
+    try {
+      mkdirSync(fallback.root, { recursive: true })
+      fallback.exists = true // 兜底目录本次已创建，避免下方循环把它当「待创建」再打 ✚ 行
+      log(tr('install.fallback', { root: fallback.relative }))
+      targets = [fallback]
+    } catch (e) {
+      log(tr('install.rootCreateFailed', { root: `~/${fallback.relative}`, message: e.message }))
+      summary.push({
+        root: fallback.root,
+        dest: path.join(fallback.root, 'code-atlas'),
+        status: 'failed',
+        reason: tr('install.reason.rootCreateFailed', { message: e.message }),
+      })
+      targets = [] // 兜底失败：无任何目标可装，落到统一收尾（failed>0 → 退出码 1）
+    }
   }
 
-  const summary = []
   for (const tgt of targets) {
     const dest = path.join(tgt.root, 'code-atlas')
+    let rootCreated = false
     if (!tgt.exists) {
-      // 三级探测第 2 级：目录缺失但本体存在 → 创建 skills 目录再安装
-      mkdirSync(tgt.root, { recursive: true })
+      // 三级探测第 2 级：目录缺失但本体存在 → 创建 skills 目录再安装。
+      // 先分类再动作（与 f51da49 占位保护语义一致）：根被非目录占用/创建失败
+      // → 本目标 failed、继续其余目标，绝不在逐目标错误处理之外抛出中止全部。
+      const rootState = classifyDest(tgt.root)
+      if (rootState.kind === 'other') {
+        log(tr('install.rootOccupied', { root: `~/${tgt.relative}`, type: rootState.type }))
+        summary.push({
+          root: tgt.root, dest, status: 'failed',
+          reason: tr('install.reason.rootOccupied', { type: rootState.type }),
+        })
+        continue
+      }
+      try {
+        mkdirSync(tgt.root, { recursive: true })
+      } catch (e) {
+        log(tr('install.rootCreateFailed', { root: `~/${tgt.relative}`, message: e.message }))
+        summary.push({
+          root: tgt.root, dest, status: 'failed',
+          reason: tr('install.reason.rootCreateFailed', { message: e.message }),
+        })
+        continue
+      }
+      rootCreated = true
       log(tr('install.created', { root: `~/${tgt.relative}`, agent: tgt.agent }))
     }
     const cur = classifyDest(dest)
@@ -226,6 +274,7 @@ export function installSkill(options = {}) {
     } catch (e) {
       log(tr('install.copyFailed', { message: e.message }))
       failTarget(dest, destPreExisted, log)
+      rollbackCreatedRoot(tgt.root, rootCreated, log)
       summary.push({ root: tgt.root, dest, status: 'failed', reason: tr('install.reason.copyFailed', { message: e.message }) })
       continue
     }
@@ -234,6 +283,7 @@ export function installSkill(options = {}) {
     if (!npmResult.ok) {
       log(tr('install.npmFailed', { detail: indent(npmResult.error || '') }))
       failTarget(dest, destPreExisted, log)
+      rollbackCreatedRoot(tgt.root, rootCreated, log)
       summary.push({ root: tgt.root, dest, status: 'failed', reason: tr('install.reason.npmFailed') })
       continue
     }

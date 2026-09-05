@@ -224,6 +224,91 @@ function main() {
   }
 
   // ----------------------------------------------------------------
+  section('occupied_root_path_isolated')
+  {
+    // P1-2 场景 1：可创建根（skills 目录路径本身）被普通文件占位 → 该目标 failed，
+    // 其余目标照常安装，整体退出码 1，占位文件原样保留（先分类再动作，与 f51da49 语义一致）
+    const home = fakeHome()
+    makeRoots(home, ['claude'])
+    mkdirSync(path.join(home, '.agents'), { recursive: true })
+    writeFileSync(path.join(home, '.agents', 'skills'), 'precious root placeholder\n')
+    const lines = []
+    const npm = stubNpm()
+    const { code, summary } = installSkill({
+      homedir: home, log: (m) => lines.push(m), runNpmInstall: npm.run, pathEnv: fakeBinDir(home, ['kimi']),
+    })
+    const agentsRoot = path.join(home, '.agents', 'skills')
+    assert('agents 根被文件占位 → 整体退出码 1', code === 1)
+    assert('agents 根占位 → 该目标 failed 且注明占用',
+      summary.some((s) => s.root === agentsRoot && s.status === 'failed'
+        && s.reason.includes('occupied by a non-directory')))
+    assert('其余目标照常安装（claude）',
+      summary.some((s) => s.root === path.dirname(destOf(home, 'claude')) && s.status === 'installed'))
+    assert('占位文件原样保留',
+      readFileSync(path.join(home, '.agents', 'skills'), 'utf8') === 'precious root placeholder\n')
+    assert('探测输出打印根占位报错', lines.some((l) => l.includes('occupied by a non-directory') && l.includes('.agents')))
+    assert('占位目标未触发 npm（仅 claude 一次）', npm.calls.length === 1 && npm.calls[0] === destOf(home, 'claude'))
+    rmSync(home, { recursive: true, force: true })
+
+    // P1-2 场景 2：四根全空且兜底根 ~/.agents 被文件占位 → 兜底创建失败计 failed（不再整体抛出中止）
+    const home2 = fakeHome()
+    writeFileSync(path.join(home2, '.agents'), 'precious root placeholder\n')
+    const r2 = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: '' })
+    assert('兜底根被占位 → failed 且整体退出码 1',
+      r2.code === 1 && r2.summary.length === 1 && r2.summary[0].status === 'failed')
+    assert('兜底占位文件原样保留', readFileSync(path.join(home2, '.agents'), 'utf8') === 'precious root placeholder\n')
+    assert('兜底失败不创建任何 skills 目录',
+      !existsSync(path.join(home2, '.claude')) && !existsSync(path.join(home2, '.codex'))
+      && !existsSync(path.join(home2, '.config')))
+    rmSync(home2, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
+  section('created_root_failure_rollback')
+  {
+    // P1-2 场景 3：新建根 + npm 失败 → 空根一并回滚，下一轮不会因残留根被一级探测误选中
+    const home = fakeHome()
+    const binDir = fakeBinDir(home, ['kimi'])
+    const badDest = destOf(home, 'agents')
+    const r1 = installSkill({
+      homedir: home, log: NOLOG,
+      runNpmInstall: stubNpm({ failFor: (cwd) => cwd === badDest }).run, pathEnv: binDir,
+    })
+    assert('run1 新建根安装失败 → failed 且整体退出码 1',
+      r1.code === 1 && r1.summary[0].status === 'failed')
+    assert('run1 空根已回滚（~/.agents/skills 不残留，下一轮不会被一级探测误选中）',
+      !existsSync(path.join(home, '.agents', 'skills')))
+    const lines2 = []
+    const r2 = installSkill({ homedir: home, log: (m) => lines2.push(m), runNpmInstall: stubNpm().run, pathEnv: binDir })
+    assert('run2 再次按二级探测创建并安装成功',
+      r2.code === 0 && r2.summary[0].status === 'installed')
+    assert('run2 探测行仍为 ✚ creatable（上一轮未残留根）',
+      lines2.some((l) => l.includes('✚ creatable (detected kimi)')))
+    rmSync(home, { recursive: true, force: true })
+
+    // P1-2 场景 4：失败时根内已出现其他内容 → 根非空则保留并说明（绝不误删用户数据）
+    const home2 = fakeHome()
+    const binDir2 = fakeBinDir(home2, ['kimi'])
+    const badDest2 = destOf(home2, 'agents')
+    const linesB = []
+    const npmB = stubNpm({
+      failFor: (cwd) => {
+        if (cwd !== badDest2) return false
+        writeFileSync(path.join(cwd, '..', 'user-file.txt'), 'mine\n') // 模拟根内混入其他内容
+        return true
+      },
+    })
+    const rB = installSkill({ homedir: home2, log: (m) => linesB.push(m), runNpmInstall: npmB.run, pathEnv: binDir2 })
+    assert('非空根场景 → failed 且整体退出码 1',
+      rB.code === 1 && rB.summary[0].status === 'failed')
+    assert('非空根保留（用户内容未被误删）',
+      existsSync(path.join(home2, '.agents', 'skills', 'user-file.txt')))
+    assert('code-atlas 目标目录仍被回滚', !existsSync(destOf(home2, 'agents')))
+    assert('日志说明根保留', linesB.some((l) => l.includes('not empty, kept')))
+    rmSync(home2, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
   section('copy_content_and_exclusions')
   {
     const home = fakeHome()
