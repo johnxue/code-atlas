@@ -206,10 +206,10 @@ export function installSkill(options = {}) {
     const fallback = roots.find((r) => r.id === 'agents')
     // 兜底创建同样纳入逐目标错误语义：根被占位/创建失败 → 计 failed（退出码 1），不再整体中止
     try {
-      mkdirSync(fallback.root, { recursive: true })
-      // 兜底根由本轮创建 → 携带 rootCreated 进入下方循环：失败时空根一并回滚，
-      // 与二级创建同一条状态机语义；否则残留空根会被下一轮一级探测误选中
-      fallback.rootCreated = true
+      const created = mkdirSync(fallback.root, { recursive: true })
+      // 仅当本次真正创建（返回新建路径）才携带 rootCreated：recursive mkdir 对已存在
+      // 目录返回 undefined（竞态窗口）→ 保持 false，回滚就不会误删非本轮创建的目录
+      fallback.rootCreated = created !== undefined
       fallback.exists = true // 兜底目录本次已就位，避免下方循环把它当「待创建」再打 ✚ 行
       log(tr('install.fallback', { root: fallback.relative }))
       targets = [fallback]
@@ -243,7 +243,9 @@ export function installSkill(options = {}) {
         continue
       }
       try {
-        mkdirSync(tgt.root, { recursive: true })
+        // 仅当本次真正创建（返回新建路径）才置 rootCreated：目录恰已存在（竞态窗口）
+        // 时保持 false，回滚就不会误删非本轮创建的目录
+        rootCreated = mkdirSync(tgt.root, { recursive: true }) !== undefined
       } catch (e) {
         log(tr('install.rootCreateFailed', { root: `~/${tgt.relative}`, message: e.message }))
         summary.push({
@@ -252,7 +254,6 @@ export function installSkill(options = {}) {
         })
         continue
       }
-      rootCreated = true
       log(tr('install.created', { root: `~/${tgt.relative}`, agent: tgt.agent }))
     }
     const cur = classifyDest(dest)

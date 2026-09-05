@@ -441,6 +441,8 @@ function main() {
     assert('失败后继续下一目标且成功',
       byDest[destOf(home, 'codex')].status === 'installed')
     assertNoPath('新建失败目标已整体回滚（不留假完成目录）', badDest)
+    assert('既有根保留不回滚（rootCreated=false 语义：非本轮创建的目录不删）',
+      existsSync(path.dirname(badDest)))
     rmSync(home, { recursive: true, force: true })
   }
 
