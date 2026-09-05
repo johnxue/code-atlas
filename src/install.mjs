@@ -1,6 +1,9 @@
 // ==============================================================================
-// src/install.mjs — code-atlas install：把 skill 本体装进探测到的 agent skills 目录
+// src/install.mjs — code-atlas install：三级探测并把 skill 本体装进 agent skills 目录
 // ==============================================================================
+// 探测三级：① skills 目录存在 → 照旧；② 目录缺失但 agent 本体存在（home 专属目录
+// 或 PATH 可执行文件，见 AGENT_PROBES）→ 创建该 skills 目录并安装；③ 本体也没有 → 跳过。
+// 四根全落空时兜底创建 ~/.agents/skills（语义不变）。
 // 纯 Node API（fs.cpSync / mkdirSync / rmSync），文件操作不经 shell（Windows 兼容）。
 // 唯一的子进程是 npm install --omit=dev（spawnSync 无 shell；Windows 走 npm.cmd + shell，
 // 因新版 Node 对 .cmd 直接 spawn 会 EINVAL）。homedir / npmRunner 可注入：
@@ -11,7 +14,7 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, constants as fsConstants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,11 +35,50 @@ export const SKILL_ROOTS = [
   { id: 'opencode', labelKey: 'install.agent.opencode', relative: '.config/opencode/skills' },
 ]
 
-export function detectRoots(homedir = os.homedir()) {
+export function detectRoots(homedir = os.homedir(), { pathEnv = process.env.PATH } = {}) {
   return SKILL_ROOTS.map((r) => {
     const root = path.join(homedir, ...r.relative.split('/'))
-    return { ...r, root, exists: isDir(root) }
+    const exists = isDir(root)
+    // 三级探测：skills 目录缺失但检测到 agent 本体 → 可创建（agent=证据名，空串=未检测到）
+    return { ...r, root, exists, agent: exists ? '' : detectAgent(r.id, homedir, pathEnv) }
   })
+}
+
+// 三级探测的本体证据：一级 = home 下专属目录；二级 = PATH 上的可执行文件
+// （agents 为通用根，无专属目录，只认 PATH 上的四个通用 CLI 之一）。
+const AGENT_PROBES = {
+  claude: { homeDir: '.claude', bins: ['claude'] },
+  agents: { homeDir: '', bins: ['kimi', 'codex', 'pi', 'hermes'] },
+  codex: { homeDir: '.codex', bins: ['codex'] },
+  opencode: { homeDir: '.config/opencode', bins: ['opencode'] },
+}
+
+// PATH 查找：按平台分隔符切目录；POSIX 要求 X_OK 权限位（同名非执行文件不算证据）；
+// Windows 额外匹配可执行扩展名。返回命中路径，未命中返回空串。
+function findOnPath(name, pathEnv) {
+  if (!pathEnv) return ''
+  const exts = process.platform === 'win32' ? ['', '.exe', '.cmd', '.bat'] : ['']
+  for (const dir of pathEnv.split(path.delimiter)) {
+    if (!dir) continue
+    for (const ext of exts) {
+      const candidate = path.join(dir, name + ext)
+      try {
+        accessSync(candidate, fsConstants.X_OK)
+        return candidate
+      } catch { /* 不是这个，继续找 */ }
+    }
+  }
+  return ''
+}
+
+// 返回检测到的 agent 证据名（探测输出「检测到 <agent>」用）；空串 = 完全未检测到
+function detectAgent(id, homedir, pathEnv) {
+  const probe = AGENT_PROBES[id]
+  if (probe.homeDir && isDir(path.join(homedir, ...probe.homeDir.split('/')))) return id
+  for (const bin of probe.bins) {
+    if (findOnPath(bin, pathEnv)) return bin
+  }
+  return ''
 }
 
 function isDir(p) {
@@ -112,7 +154,13 @@ function failTarget(dest, destPreExisted, log) {
 }
 
 /**
- * 安装 skill 本体到所有已存在的 skills 根；四个都不存在时创建 ~/.agents/skills 并装入。
+ * 三级探测安装 skill 本体：
+ *   1. skills 目录存在 → 照旧安装；
+ *   2. 目录缺失但检测到 agent 本体（home 专属目录或 PATH 可执行文件）→ 创建该目录并安装；
+ *   3. 完全检测不到 → 跳过。四个根都检测不到时兜底创建 ~/.agents/skills 并装入（不变）。
+ * @param {{ homedir?: string, sourceRoot?: string, log?: Function,
+ *   runNpmInstall?: Function, pathEnv?: string }} options
+ *   pathEnv 为 PATH 注入 seam（本体探测用；空串 = 无任何 PATH 证据）
  * @returns {{ code: number, summary: Array<{root: string, dest: string,
  *   status: 'installed'|'skipped'|'failed', version?: string, reason?: string}> }}
  */
@@ -122,21 +170,25 @@ export function installSkill(options = {}) {
     sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
     log = (m) => console.log(m),
     runNpmInstall = defaultNpmRunner,
+    pathEnv = process.env.PATH,
   } = options
   const version = readVersion(path.join(sourceRoot, 'package.json')) || 'unknown'
   log(tr('install.title', { version }))
 
-  const roots = detectRoots(homedir)
+  const roots = detectRoots(homedir, { pathEnv })
   log(tr('install.probing'))
   for (const r of roots) {
-    const label = tr(r.labelKey)
-    log(`   ${r.exists ? tr('install.probe.exists') : tr('install.probe.missing')}  ~/${r.relative}  (${label})`)
+    const state = r.exists ? `✔ ${tr('install.probe.exists')}`
+      : r.agent ? `✚ ${tr('install.probe.creatable', { agent: r.agent })}`
+      : `✘ ${tr('install.probe.missing')}`
+    log(`   ${state}  ~/${r.relative}  (${tr(r.labelKey)})`)
   }
 
-  let targets = roots.filter((r) => r.exists)
+  let targets = roots.filter((r) => r.exists || r.agent)
   if (targets.length === 0) {
     const fallback = roots.find((r) => r.id === 'agents')
     mkdirSync(fallback.root, { recursive: true })
+    fallback.exists = true // 兜底目录本次已创建，避免下方循环把它当「待创建」再打 ✚ 行
     log(tr('install.fallback', { root: fallback.relative }))
     targets = [fallback]
   }
@@ -144,6 +196,11 @@ export function installSkill(options = {}) {
   const summary = []
   for (const tgt of targets) {
     const dest = path.join(tgt.root, 'code-atlas')
+    if (!tgt.exists) {
+      // 三级探测第 2 级：目录缺失但本体存在 → 创建 skills 目录再安装
+      mkdirSync(tgt.root, { recursive: true })
+      log(tr('install.created', { root: `~/${tgt.relative}`, agent: tgt.agent }))
+    }
     const cur = classifyDest(dest)
     if (cur.kind === 'other') {
       log(tr('install.destOccupied', { dest, type: cur.type }))

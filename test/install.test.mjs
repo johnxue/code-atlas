@@ -9,7 +9,7 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -49,6 +49,17 @@ function makeRoots(home, ids) {
 }
 const destOf = (home, id) => path.join(detectRoots(home).find((x) => x.id === id).root, 'code-atlas')
 
+// 假 PATH 目录：注入可执行文件桩（X_OK 权限位），模拟「PATH 上有某 agent 本体」
+function fakeBinDir(home, names) {
+  const binDir = path.join(home, 'fakebin')
+  mkdirSync(binDir, { recursive: true })
+  for (const n of names) {
+    writeFileSync(path.join(binDir, n), '#!/bin/sh\n')
+    chmodSync(path.join(binDir, n), 0o755)
+  }
+  return binDir
+}
+
 // npm 桩：记录调用，可按 cwd 注入失败
 function stubNpm({ failFor = () => false } = {}) {
   const calls = []
@@ -87,7 +98,7 @@ function main() {
     const home = fakeHome()
     makeRoots(home, ['claude', 'codex'])
     const npm = stubNpm()
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     assert('退出码 0', code === 0)
     assert('恰好安装到 2 个已存在根',
       summary.length === 2 && summary.every((s) => s.status === 'installed'))
@@ -100,12 +111,103 @@ function main() {
   }
 
   // ----------------------------------------------------------------
+  section('three_level_dir_missing_but_agent_detected_creates')
+  {
+    // 三级探测第 2 级：skills 目录缺失但 agent 本体存在 → 创建该 skills 目录并安装。
+    // 四根逐个验证；证据类型覆盖 PATH 可执行文件（claude/agents）与 home 专属目录（codex/opencode）。
+    const cases = [
+      { id: 'claude', agent: 'claude', rel: '.claude/skills', setup: (home) => fakeBinDir(home, ['claude']) },
+      { id: 'agents', agent: 'kimi', rel: '.agents/skills', setup: (home) => fakeBinDir(home, ['kimi']) },
+      { id: 'codex', agent: 'codex', rel: '.codex/skills',
+        setup: (home) => mkdirSync(path.join(home, '.codex'), { recursive: true }) },
+      { id: 'opencode', agent: 'opencode', rel: '.config/opencode/skills',
+        setup: (home) => mkdirSync(path.join(home, '.config', 'opencode'), { recursive: true }) },
+    ]
+    for (const c of cases) {
+      const home = fakeHome()
+      const pathEnv = c.setup(home) // home 目录证据场景返回 undefined → 注入空 pathEnv（无 PATH 证据）
+      const lines = []
+      const npm = stubNpm()
+      const { code, summary } = installSkill({
+        homedir: home, log: (m) => lines.push(m), runNpmInstall: npm.run, pathEnv: pathEnv || '',
+      })
+      const root = path.dirname(destOf(home, c.id))
+      assert(`${c.id} 本体存在（目录缺失）→ 退出码 0`, code === 0)
+      assert(`${c.id} 目录缺失但本体存在 → 创建该 skills 目录并安装`,
+        summary.length === 1 && summary[0].status === 'installed' && summary[0].root === root)
+      assert(`${c.id} skills 目录已落盘且 SKILL.md 就位`,
+        existsSync(path.join(root, 'code-atlas', 'SKILL.md')))
+      assert(`${c.id} 探测输出打印 ✚ 已创建 ~/${c.rel}（检测到 ${c.agent}）`,
+        lines.some((l) => l.includes(`✚ Created ~/${c.rel} (detected ${c.agent})`)))
+      assert(`${c.id} 创建安装时 npm 恰跑一次`, npm.calls.length === 1)
+      rmSync(home, { recursive: true, force: true })
+    }
+    {
+      // 波及面检查：单一根经 PATH 证据创建时，其余三根未被顺手创建
+      const home = fakeHome()
+      installSkill({ homedir: home, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: fakeBinDir(home, ['claude']) })
+      assert('claude 经 PATH 证据创建，其余三根未被创建',
+        existsSync(path.join(home, '.claude', 'skills', 'code-atlas', 'SKILL.md'))
+        && !existsSync(path.join(home, '.agents')) && !existsSync(path.join(home, '.codex'))
+        && !existsSync(path.join(home, '.config')))
+      rmSync(home, { recursive: true, force: true })
+    }
+  }
+
+  // ----------------------------------------------------------------
+  section('three_level_agent_also_missing_skips')
+  {
+    // 三级探测第 3 级：本体也没有 → 跳过该根（锚一个已存在根，避免触发四根全空的兜底）
+    const cases = [
+      { id: 'claude', anchor: 'codex' },
+      { id: 'agents', anchor: 'claude' },
+      { id: 'codex', anchor: 'claude' },
+      { id: 'opencode', anchor: 'claude' },
+    ]
+    for (const c of cases) {
+      const home = fakeHome()
+      makeRoots(home, [c.anchor])
+      const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: '' })
+      const root = path.dirname(destOf(home, c.id))
+      assert(`${c.id} 本体也没有 → 退出码 0 且仅锚根安装`,
+        code === 0 && summary.length === 1 && summary[0].root === path.dirname(destOf(home, c.anchor)))
+      assert(`${c.id} 不进安装目标`, !summary.some((s) => s.root === root))
+      assert(`${c.id} skills 目录未被创建`, !existsSync(root))
+      rmSync(home, { recursive: true, force: true })
+    }
+  }
+
+  // ----------------------------------------------------------------
+  section('three_level_mixed_existing_and_creatable')
+  {
+    // 已存在根与可创建根共存：两个都装；探测行分别为 ✔ 与 ✚，创建行打印 ✚ 已创建
+    const home = fakeHome()
+    makeRoots(home, ['claude'])
+    const binDir = fakeBinDir(home, ['codex'])
+    const lines = []
+    const { code, summary } = installSkill({
+      homedir: home, log: (m) => lines.push(m), runNpmInstall: stubNpm().run, pathEnv: binDir,
+    })
+    assert('已存在根 + 可创建根共存 → 退出码 0', code === 0)
+    // codex 在 PATH 上同时是 agents（通用根）与 codex 两个根的本体证据 → 共 3 个目标
+    assert('已存在根 + 两个可创建根都安装',
+      summary.length === 3 && summary.every((s) => s.status === 'installed'))
+    assert('探测输出同时出现 ✔ 存在与 ✚ 可创建（检测到 codex）',
+      lines.some((l) => l.includes('✔ exists') && l.includes('~/.claude/skills'))
+      && lines.filter((l) => l.includes('✚ creatable (detected codex)')).length === 2)
+    assert('安装循环打印 ✚ 已创建 ~/.codex/skills（检测到 codex）',
+      lines.some((l) => l.includes('✚ Created ~/.codex/skills (detected codex)'))
+      && lines.some((l) => l.includes('✚ Created ~/.agents/skills (detected codex)')))
+    rmSync(home, { recursive: true, force: true })
+  }
+
+  // ----------------------------------------------------------------
   section('copy_content_and_exclusions')
   {
     const home = fakeHome()
     makeRoots(home, ['agents'])
     const npm = stubNpm()
-    installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     const dest = destOf(home, 'agents')
     for (const rel of ['SKILL.md', 'package.json', 'bin/code-atlas.mjs', 'src/install.mjs',
       'src/engine.mjs', 'packages/lang-dart/package.json', 'packages/lang-dart/index.js',
@@ -128,11 +230,11 @@ function main() {
     const home = fakeHome()
     makeRoots(home, ['claude'])
     const first = stubNpm()
-    installSkill({ homedir: home, log: NOLOG, runNpmInstall: first.run })
+    installSkill({ homedir: home, log: NOLOG, runNpmInstall: first.run, pathEnv: '' })
     const dest = destOf(home, 'claude')
     writeFileSync(path.join(dest, 'sentinel.txt'), 'untouched')
     const second = stubNpm()
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: second.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: second.run, pathEnv: '' })
     assert('重复运行退出码 0', code === 0)
     assert('同版本目标标记 skipped', summary.length === 1 && summary[0].status === 'skipped')
     assert('跳过时不重跑 npm install', second.calls.length === 0)
@@ -151,7 +253,7 @@ function main() {
     writeFileSync(path.join(dest, 'package.json'), JSON.stringify({ name: 'code-atlas', version: '0.0.1' }))
     writeFileSync(path.join(dest, 'stale-row.md'), 'old junk')
     const npm = stubNpm()
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     assert('异版本目标退出码 0', code === 0)
     assert('异版本目标标记 installed', summary.length === 1 && summary[0].status === 'installed')
     assert('覆盖时重跑 npm install', npm.calls.length === 1)
@@ -168,7 +270,7 @@ function main() {
   {
     const home = fakeHome()
     const npm = stubNpm()
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     assert('默认路径退出码 0', code === 0)
     assert('默认创建并安装到 ~/.agents/skills/code-atlas',
       summary.length === 1 && summary[0].dest === destOf(home, 'agents')
@@ -187,7 +289,7 @@ function main() {
     makeRoots(home, ['claude', 'codex'])
     const badDest = destOf(home, 'claude')
     const npm = stubNpm({ failFor: (cwd) => cwd === badDest })
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     assert('有失败时整体退出码 1', code === 1)
     const byDest = Object.fromEntries(summary.map((s) => [s.dest, s]))
     assert('失败目标标记 failed 且注明原因',
@@ -208,12 +310,12 @@ function main() {
     // 场景 1：全新安装 npm 失败 → dest 整体回滚 → 下轮重试为 installed
     const home1 = fakeHome()
     makeRoots(home1, ['claude'])
-    const r1 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: failNpm })
+    const r1 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: failNpm, pathEnv: '' })
     assert('场景1 第一轮 failed 且整体退出码 1',
       r1.code === 1 && r1.summary[0].status === 'failed')
     assertNoPath('场景1 失败目录已回滚', destOf(home1, 'claude'))
     const good1 = stubNpm()
-    const r2 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: good1.run })
+    const r2 = installSkill({ homedir: home1, log: NOLOG, runNpmInstall: good1.run, pathEnv: '' })
     assert('场景1 第二轮重试为 installed 而非 skipped',
       r2.code === 0 && r2.summary[0].status === 'installed')
     assert('场景1 第二轮确实重跑了 npm install', good1.calls.length === 1)
@@ -227,7 +329,7 @@ function main() {
     mkdirSync(dest2, { recursive: true })
     writeFileSync(path.join(dest2, 'package.json'),
       JSON.stringify({ name: 'code-atlas', version: '0.0.1' }))
-    const r1b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: failNpm })
+    const r1b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: failNpm, pathEnv: '' })
     assert('场景2 第一轮 failed 且整体退出码 1',
       r1b.code === 1 && r1b.summary[0].status === 'failed')
     assert('场景2 失败后写入 .install-incomplete 标记',
@@ -235,7 +337,7 @@ function main() {
     assert('场景2 目录残留同版本 package.json（假幂等隐患的前提）',
       JSON.parse(readFileSync(path.join(dest2, 'package.json'), 'utf8')).version === SOURCE_VERSION)
     const good2 = stubNpm()
-    const r2b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: good2.run })
+    const r2b = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: good2.run, pathEnv: '' })
     assert('场景2 第二轮同版本也重试为 installed 而非 skipped',
       r2b.code === 0 && r2b.summary[0].status === 'installed')
     assert('场景2 第二轮确实重跑了 npm install', good2.calls.length === 1)
@@ -249,9 +351,9 @@ function main() {
     const home = fakeHome()
     makeRoots(home, ['claude', 'opencode'])
     const first = stubNpm()
-    const r1 = installSkill({ homedir: home, log: NOLOG, runNpmInstall: first.run })
+    const r1 = installSkill({ homedir: home, log: NOLOG, runNpmInstall: first.run, pathEnv: '' })
     const second = stubNpm()
-    const r2 = installSkill({ homedir: home, log: NOLOG, runNpmInstall: second.run })
+    const r2 = installSkill({ homedir: home, log: NOLOG, runNpmInstall: second.run, pathEnv: '' })
     assert('两次运行退出码一致且为 0', r1.code === 0 && r2.code === 0)
     assert('第二次全部 skipped',
       r2.summary.length === 2 && r2.summary.every((s) => s.status === 'skipped'))
@@ -286,7 +388,7 @@ function main() {
     const fileDest = destOf(home, 'claude')
     writeFileSync(fileDest, 'precious user file\n')
     const npm = stubNpm()
-    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run })
+    const { code, summary } = installSkill({ homedir: home, log: NOLOG, runNpmInstall: npm.run, pathEnv: '' })
     const byDest = Object.fromEntries(summary.map((s) => [s.dest, s]))
     assert('文件占位 → 整体退出码 1', code === 1)
     assert('文件占位 → 状态 failed 且注明非目录占用',
@@ -307,7 +409,7 @@ function main() {
     mkdirSync(real, { recursive: true })
     writeFileSync(path.join(real, 'keep.txt'), 'inside symlink target')
     symlinkSync(real, linkDest)
-    const r2 = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: stubNpm().run })
+    const r2 = installSkill({ homedir: home2, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: '' })
     assert('目录软链占位 → failed 且整体退出码 1',
       r2.code === 1 && r2.summary[0].status === 'failed')
     assert('目录软链占位 → reason 注明 symlink',
@@ -323,7 +425,7 @@ function main() {
     makeRoots(home3, ['claude'])
     const dangling = destOf(home3, 'claude')
     symlinkSync(path.join(home3, 'nowhere'), dangling)
-    const r3 = installSkill({ homedir: home3, log: NOLOG, runNpmInstall: stubNpm().run })
+    const r3 = installSkill({ homedir: home3, log: NOLOG, runNpmInstall: stubNpm().run, pathEnv: '' })
     assert('悬空软链占位 → failed（existsSync 看不见但 lstat 看得见）',
       r3.code === 1 && r3.summary[0].status === 'failed')
     assert('悬空软链原样保留',
