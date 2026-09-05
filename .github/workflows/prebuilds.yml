@@ -28,7 +28,8 @@ jobs:
       # The committed src/ is already generated from this exact commit, so this
       # step is a no-op sanity check unless the grammar pin is bumped.
       - name: Show pinned grammar commit
-        run: echo "grammar: nielsenko/tree-sitter-dart @ b57d734c84f510bbd524097902cab671e4dbfca9 (src/ committed)"
+        run: |
+          echo "grammar: nielsenko/tree-sitter-dart @ b57d734c84f510bbd524097902cab671e4dbfca9 (src/ committed)"
 
       - uses: actions/setup-node@v4
         with:
